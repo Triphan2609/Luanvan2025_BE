@@ -7,12 +7,14 @@ import {
   Param,
   Body,
   UseGuards,
+  Delete,
 } from '@nestjs/common';
 import { AccountsService } from './accounts.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Account } from './entities/account.entity';
 
 @Controller('accounts')
 @UseGuards(JwtAuthGuard)
@@ -20,7 +22,7 @@ export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
 
   @Get()
-  findAll() {
+  async findAll(): Promise<Account[]> {
     return this.accountsService.findAll();
   }
 
@@ -30,7 +32,10 @@ export class AccountsController {
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() updateAccountDto: UpdateAccountDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateAccountDto: UpdateAccountDto,
+  ): Promise<Account> {
     return this.accountsService.update(id, updateAccountDto);
   }
 
@@ -43,7 +48,12 @@ export class AccountsController {
   }
 
   @Patch(':id/status')
-  toggleStatus(@Param('id') id: string) {
+  async toggleStatus(@Param('id') id: string): Promise<Account> {
     return this.accountsService.toggleStatus(id);
+  }
+
+  @Delete(':id')
+  async deleteAccount(@Param('id') id: string): Promise<void> {
+    return this.accountsService.deleteAccount(id);
   }
 }

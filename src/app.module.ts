@@ -4,6 +4,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import databaseConfig from './config/database.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { AccountsModule } from './modules/accounts/accounts.module'; // Import AccountsModule
+import { RolesModule } from './modules/roles/roles.module';
+import { BranchesModule } from './modules/branches/branches.module';
+import { BranchTypesModule } from './modules/branch-types/branch-types.module';
+import { ServicesModule } from './modules/services/services.module';
+import { AreasModule } from './modules/areas/areas.module';
 
 @Module({
   imports: [
@@ -32,6 +37,11 @@ import { AccountsModule } from './modules/accounts/accounts.module'; // Import A
     }),
     AuthModule,
     AccountsModule,
+    RolesModule,
+    BranchesModule,
+    BranchTypesModule,
+    ServicesModule,
+    AreasModule,
   ],
 })
 export class AppModule {}

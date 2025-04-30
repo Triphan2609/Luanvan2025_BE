@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
+import { Role } from '../../roles/entities/role.entity';
 
 @Entity('accounts')
 export class Account {
@@ -17,15 +18,12 @@ export class Account {
   @Column({ unique: true })
   email: string;
 
-  @Column()
-  role: string;
-
   @Column({ default: 'active' })
   status: string;
 
   @Column({ type: 'timestamp', nullable: true })
-  lastLogin: Date;
+  lastLogin: Date | null;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
+  @ManyToOne(() => Role, (role) => role.accounts, { eager: true })
+  role: Role;
 }

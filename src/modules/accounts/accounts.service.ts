@@ -3,12 +3,13 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import { In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Role } from '../roles/entities/role.entity';
 import { Account } from './entities/account.entity';
 import { CreateAccountDto } from './dto/create-account.dto';
-import { UpdateAccountDto } from './dto/update-account.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -16,62 +17,61 @@ export class AccountsService {
   constructor(
     @InjectRepository(Account)
     private readonly accountsRepository: Repository<Account>,
+    @InjectRepository(Role)
+    private readonly roleRepository: Repository<Role>, // Thêm roleRepository
   ) {}
 
   async findAll(): Promise<Account[]> {
-    return this.accountsRepository.find();
+    return this.accountsRepository.find({
+      relations: ['role'], // Lấy kèm thông tin role
+    });
   }
 
   async create(createAccountDto: CreateAccountDto): Promise<Account> {
-    // Kiểm tra tài khoản đã tồn tại
-    const existingAccount = await this.accountsRepository.findOne({
-      where: [
-        { username: createAccountDto.username },
-        { email: createAccountDto.email },
-      ],
-    });
+    const { roleId, password, ...accountData } = createAccountDto;
 
-    if (existingAccount) {
-      throw new ConflictException('Tên đăng nhập hoặc email đã tồn tại');
+    // Kiểm tra vai trò
+    const role = await this.roleRepository.findOne({ where: { id: roleId } });
+    if (!role) {
+      throw new NotFoundException('Vai trò không tồn tại');
     }
 
-    // Hash mật khẩu
-    const hashedPassword = await bcrypt.hash(createAccountDto.password, 10);
+    // Mã hóa mật khẩu
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Tạo tài khoản mới
-    const newAccount = this.accountsRepository.create({
-      ...createAccountDto,
+    // Tạo tài khoản
+    const account = this.accountsRepository.create({
+      ...accountData,
       password: hashedPassword,
+      role,
     });
 
-    return this.accountsRepository.save(newAccount);
+    return this.accountsRepository.save(account);
   }
 
   async update(
     id: string,
     updateAccountDto: UpdateAccountDto,
   ): Promise<Account> {
-    const account = await this.accountsRepository.findOne({ where: { id } });
+    const { roleId, ...accountData } = updateAccountDto;
+
+    const account = await this.accountsRepository.findOne({
+      where: { id },
+      relations: ['role'],
+    });
     if (!account) {
       throw new NotFoundException('Tài khoản không tồn tại');
     }
 
-    // Kiểm tra trùng lặp username hoặc email
-    if (updateAccountDto.username || updateAccountDto.email) {
-      const existingAccount = await this.accountsRepository.findOne({
-        where: [
-          { username: updateAccountDto.username },
-          { email: updateAccountDto.email },
-        ],
-      });
-
-      if (existingAccount && existingAccount.id !== id) {
-        throw new ConflictException('Tên đăng nhập hoặc email đã tồn tại');
+    if (roleId) {
+      const role = await this.roleRepository.findOne({ where: { id: roleId } });
+      if (!role) {
+        throw new NotFoundException('Vai trò không tồn tại');
       }
+      account.role = role;
     }
 
-    // Cập nhật thông tin tài khoản
-    Object.assign(account, updateAccountDto);
+    Object.assign(account, accountData);
     return this.accountsRepository.save(account);
   }
 
@@ -91,6 +91,17 @@ export class AccountsService {
     await this.accountsRepository.save(account);
   }
 
+  async updateLastLogin(id: string, lastLogin: Date): Promise<void> {
+    const account = await this.accountsRepository.findOne({ where: { id } });
+    if (!account) {
+      throw new NotFoundException('Tài khoản không tồn tại');
+    }
+
+    account.lastLogin = lastLogin;
+    await this.accountsRepository.save(account);
+  }
+
+  // Khóa hoặc mở khóa tài khoản
   async toggleStatus(id: string): Promise<Account> {
     const account = await this.accountsRepository.findOne({ where: { id } });
     if (!account) {
@@ -99,6 +110,16 @@ export class AccountsService {
 
     account.status = account.status === 'active' ? 'locked' : 'active';
     return this.accountsRepository.save(account);
+  }
+
+  // Xóa tài khoản
+  async deleteAccount(id: string): Promise<void> {
+    const account = await this.accountsRepository.findOne({ where: { id } });
+    if (!account) {
+      throw new NotFoundException('Tài khoản không tồn tại');
+    }
+
+    await this.accountsRepository.remove(account);
   }
 
   async findByUsername(username: string): Promise<Account | null> {

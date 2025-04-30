@@ -1,23 +1,16 @@
-import { IsOptional, IsString, IsEmail } from 'class-validator';
+import { IsInt, IsOptional } from 'class-validator';
 
 export class UpdateAccountDto {
   @IsOptional()
-  @IsString()
   username?: string;
 
   @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
   fullName?: string;
 
   @IsOptional()
-  @IsString()
-  role?: string;
+  email?: string;
 
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsInt() // Đảm bảo roleId là số nguyên
+  roleId?: number;
 }
