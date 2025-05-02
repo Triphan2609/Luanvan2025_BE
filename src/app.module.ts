@@ -9,6 +9,10 @@ import { BranchesModule } from './modules/branches/branches.module';
 import { BranchTypesModule } from './modules/branch-types/branch-types.module';
 import { ServicesModule } from './modules/services/services.module';
 import { AreasModule } from './modules/areas/areas.module';
+import { EmployeesModule } from './modules/employees/employees.module';
+import { DepartmentsModule } from './modules/departments/departments.module';
+import { RolesEmployeeModule } from './modules/roles_employee/roles-employee.module';
+import { ShiftsModule } from './modules/shifts/shifts.module';
 
 @Module({
   imports: [
@@ -42,6 +46,10 @@ import { AreasModule } from './modules/areas/areas.module';
     BranchTypesModule,
     ServicesModule,
     AreasModule,
+    EmployeesModule,
+    DepartmentsModule,
+    RolesEmployeeModule,
+    ShiftsModule,
   ],
 })
 export class AppModule {}
