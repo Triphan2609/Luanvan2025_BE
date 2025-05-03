@@ -1,35 +1,37 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { EmployeesService } from './employees.service';
 import { EmployeesController } from './employees.controller';
+import { EmployeesService } from './employees.service';
 import { Employee } from './entities/employee.entity';
-import { MulterModule } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { ConfigModule } from '@nestjs/config';
+import { SalaryConfig } from './entities/salary-config.entity';
+import { Payroll } from './entities/payroll.entity';
+import { SalaryConfigService } from './salary-config.service';
+import { SalaryConfigController } from './salary-config.controller';
+import { PayrollService } from './payroll.service';
+import { PayrollController } from './payroll.controller';
+import { Department } from '../departments/entities/department.entity';
+import { RoleEmployee } from '../roles_employee/entities/role-employee.entity';
+import { Attendance } from '../shifts/entities/attendance.entity';
+import { ShiftsModule } from '../shifts/shifts.module';
 import { DepartmentsModule } from '../departments/departments.module';
 import { RolesEmployeeModule } from '../roles_employee/roles-employee.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Employee]),
-    ConfigModule,
+    TypeOrmModule.forFeature([
+      Employee,
+      SalaryConfig,
+      Payroll,
+      Department,
+      RoleEmployee,
+      Attendance,
+    ]),
+    ShiftsModule,
     DepartmentsModule,
     RolesEmployeeModule,
-    MulterModule.register({
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, callback) => {
-          const timestamp = Date.now().toString().slice(-6);
-          const random = Math.round(Math.random() * 999);
-          const name = `emp_${timestamp}${random}${extname(file.originalname)}`;
-          callback(null, name);
-        },
-      }),
-    }),
   ],
-  controllers: [EmployeesController],
-  providers: [EmployeesService],
-  exports: [EmployeesService],
+  controllers: [EmployeesController, SalaryConfigController, PayrollController],
+  providers: [EmployeesService, SalaryConfigService, PayrollService],
+  exports: [EmployeesService, SalaryConfigService, PayrollService],
 })
 export class EmployeesModule {}

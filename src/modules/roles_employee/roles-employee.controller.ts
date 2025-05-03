@@ -6,11 +6,14 @@ import {
   Patch,
   Param,
   Delete,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { RolesEmployeeService } from './roles-employee.service';
 import { CreateRoleEmployeeDto } from './dto/create-role-employee.dto';
 import { UpdateRoleEmployeeDto } from './dto/update-role-employee.dto';
+import { Public } from '../auth/guards/public.decorator';
 
+@Public()
 @Controller('roles-employee')
 export class RolesEmployeeController {
   constructor(private readonly rolesEmployeeService: RolesEmployeeService) {}
@@ -23,6 +26,11 @@ export class RolesEmployeeController {
   @Get()
   findAll() {
     return this.rolesEmployeeService.findAll();
+  }
+
+  @Get('by-department/:id')
+  findByDepartment(@Param('id', ParseIntPipe) id: number) {
+    return this.rolesEmployeeService.findByDepartment(id);
   }
 
   @Get(':id')

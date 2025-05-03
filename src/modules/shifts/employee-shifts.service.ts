@@ -65,7 +65,8 @@ export class EmployeeShiftsService {
       .createQueryBuilder('employeeShift')
       .leftJoinAndSelect('employeeShift.employee', 'employee')
       .leftJoinAndSelect('employeeShift.shift', 'shift')
-      .leftJoinAndSelect('employee.department', 'department');
+      .leftJoinAndSelect('employee.department', 'department')
+      .leftJoinAndSelect('employee.role', 'role');
 
     if (filter?.employeeId) {
       query.andWhere('employeeShift.employee_id = :employeeId', {
@@ -127,7 +128,7 @@ export class EmployeeShiftsService {
       where: {
         date: Between(startDate, endDate),
       },
-      relations: ['employee', 'shift'],
+      relations: ['employee', 'employee.department', 'employee.role', 'shift'],
       order: {
         date: 'ASC',
       },
@@ -137,7 +138,7 @@ export class EmployeeShiftsService {
   async findOne(id: number): Promise<EmployeeShift> {
     const employeeShift = await this.employeeShiftRepository.findOne({
       where: { id },
-      relations: ['employee', 'shift'],
+      relations: ['employee', 'employee.department', 'employee.role', 'shift'],
     });
     if (!employeeShift) {
       throw new NotFoundException('Lịch làm việc không tồn tại');
@@ -148,7 +149,7 @@ export class EmployeeShiftsService {
   async findByCode(code: string): Promise<EmployeeShift> {
     const employeeShift = await this.employeeShiftRepository.findOne({
       where: { schedule_code: code },
-      relations: ['employee', 'shift'],
+      relations: ['employee', 'employee.department', 'employee.role', 'shift'],
     });
     if (!employeeShift) {
       throw new NotFoundException('Lịch làm việc không tồn tại');
@@ -206,11 +207,16 @@ export class EmployeeShiftsService {
   async bulkUpdateStatus(
     ids: number[],
     status: ScheduleStatus,
-  ): Promise<number> {
+  ): Promise<{ updated: number }> {
     const result = await this.employeeShiftRepository.update(
       { id: In(ids) },
       { status },
     );
-    return result.affected || 0;
+    return { updated: result.affected || 0 };
+  }
+
+  async bulkDelete(ids: number[]): Promise<{ deleted: number }> {
+    const result = await this.employeeShiftRepository.delete({ id: In(ids) });
+    return { deleted: result.affected || 0 };
   }
 }

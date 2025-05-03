@@ -69,4 +69,13 @@ export class RolesEmployeeService {
 
     return { count: role.employees?.length || 0 };
   }
+
+  async findByDepartment(departmentId: number): Promise<RoleEmployee[]> {
+    const roles = await this.roleEmployeeRepository.find({
+      where: { department_id: departmentId },
+      order: { name: 'ASC' },
+    });
+
+    return roles;
+  }
 }

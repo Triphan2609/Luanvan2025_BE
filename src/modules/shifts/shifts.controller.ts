@@ -14,7 +14,9 @@ import { ShiftsService } from './shifts.service';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
 import { ShiftType } from './entities/shift.entity';
+import { Public } from '../auth/guards/public.decorator';
 
+@Public()
 @Controller('shifts')
 export class ShiftsController {
   constructor(private readonly shiftsService: ShiftsService) {}

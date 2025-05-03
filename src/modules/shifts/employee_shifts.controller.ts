@@ -14,7 +14,9 @@ import { EmployeeShiftsService } from './employee-shifts.service';
 import { CreateEmployeeShiftDto } from './dto/create-employee-shift.dto';
 import { UpdateEmployeeShiftDto } from './dto/update-employee-shift.dto';
 import { ScheduleStatus } from './entities/employee-shift.entity';
+import { Public } from '../auth/guards/public.decorator';
 
+@Public()
 @Controller('employee-shifts')
 export class EmployeeShiftsController {
   constructor(private readonly employeeShiftsService: EmployeeShiftsService) {}
@@ -77,11 +79,16 @@ export class EmployeeShiftsController {
   }
 
   @Patch('bulk-status')
-  bulkUpdateStatus(
-    @Body('ids') ids: number[],
-    @Body('status') status: ScheduleStatus,
+  async bulkUpdateStatus(
+    @Body() data: { ids: number[]; status: ScheduleStatus },
   ) {
-    return this.employeeShiftsService.bulkUpdateStatus(ids, status);
+    return this.employeeShiftsService.bulkUpdateStatus(data.ids, data.status);
+  }
+
+  @Delete('bulk')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async bulkDelete(@Body() data: { ids: number[] }) {
+    return this.employeeShiftsService.bulkDelete(data.ids);
   }
 
   @Delete(':id')

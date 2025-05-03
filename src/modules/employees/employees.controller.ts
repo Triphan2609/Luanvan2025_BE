@@ -17,7 +17,9 @@ import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DepartmentsService } from '../departments/departments.service';
 import { RolesEmployeeService } from '../roles_employee/roles-employee.service';
+import { Public } from '../auth/guards/public.decorator';
 
+@Public()
 @Controller('employees')
 export class EmployeesController {
   constructor(
