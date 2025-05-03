@@ -96,3 +96,62 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## Night Shift Pay Calculation
+
+The system calculates night shift pay using the following formula:
+
+```
+nightShiftPay = nightShiftHours * hourlyRate * nightShiftMultiplier
+```
+
+Where:
+
+- `hourlyRate` is calculated as `baseSalary / (standardDaysInMonth * standardHoursPerDay)`
+- `nightShiftMultiplier` defaults to 1.3 if not specified, but can be customized per payroll
+- The night shift multiplier is always ensured to be at least 1.0
+
+### Validation
+
+- The system validates that the night shift multiplier is a valid number and at least 1.0
+- If night shift hours are present but no multiplier is specified, the default value of 1.3 is used
+- The frontend ensures night shift multiplier is included in API requests when night shift hours exist
+
+A test script is available to verify this calculation:
+
+```
+node test-night-shift.js
+```
+
+## Authentication System
+
+The application uses a secure authentication system with JWT token-based authentication:
+
+### Features
+
+- Access tokens with short expiration time (15 minutes by default)
+- Refresh tokens with longer expiration time (7 days by default)
+- Token revocation capabilities
+
+### Required Environment Variables
+
+```
+JWT_SECRET=your-jwt-secret-key-here
+JWT_EXPIRES_IN=15m
+REFRESH_TOKEN_SECRET=your-refresh-token-secret-key-here
+REFRESH_TOKEN_EXPIRES_IN=7d
+```
+
+### Authentication Flow
+
+1. User logs in with username/password and receives an access token and refresh token
+2. The access token is used for authenticated API requests
+3. When the access token expires, the client can use the refresh token to obtain a new pair of tokens
+4. The user can log out, which invalidates the refresh token
+
+### API Endpoints
+
+- `POST /auth/login` - Authenticate and get tokens
+- `POST /auth/refresh` - Get new tokens using refresh token
+- `POST /auth/logout` - Invalidate refresh token
+- `GET /auth/profile` - Get user profile (requires authentication)

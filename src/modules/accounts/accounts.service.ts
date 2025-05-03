@@ -125,4 +125,11 @@ export class AccountsService {
   async findByUsername(username: string): Promise<Account | null> {
     return this.accountsRepository.findOne({ where: { username } });
   }
+
+  async findById(id: string): Promise<Account | null> {
+    return this.accountsRepository.findOne({
+      where: { id },
+      relations: ['role'],
+    });
+  }
 }

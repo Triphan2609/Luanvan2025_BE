@@ -108,6 +108,11 @@ export class CreatePayrollDto {
 
   @IsOptional()
   @IsNumber()
+  @Min(1)
+  night_shift_multiplier?: number;
+
+  @IsOptional()
+  @IsNumber()
   @Min(0)
   holiday_hours?: number;
 

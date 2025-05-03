@@ -30,8 +30,11 @@ export class EmployeeShiftsService {
     try {
       // Tự động tạo schedule_code nếu không được cung cấp
       if (!createEmployeeShiftDto.schedule_code) {
-        const countSchedules = await this.employeeShiftRepository.count();
-        createEmployeeShiftDto.schedule_code = `LS${String(countSchedules + 1).padStart(3, '0')}`;
+        // Thêm employee_id và timestamp để đảm bảo mã không trùng lặp
+        const randomSuffix = Math.floor(Math.random() * 1000)
+          .toString()
+          .padStart(3, '0');
+        createEmployeeShiftDto.schedule_code = `LS${createEmployeeShiftDto.employee_id}-${randomSuffix}`;
       }
 
       // Đặt trạng thái mặc định là PENDING nếu không được cung cấp
@@ -45,7 +48,9 @@ export class EmployeeShiftsService {
       return this.employeeShiftRepository.save(employeeShift);
     } catch (error) {
       // Xử lý lỗi trùng lặp schedule_code
-      if ((error as PostgresError).code === '23505') {
+      const pgError = error as PostgresError;
+      const mysqlError = error as { code?: string };
+      if (pgError.code === '23505' || mysqlError.code === 'ER_DUP_ENTRY') {
         throw new BadRequestException('Mã lịch làm việc đã tồn tại');
       }
       throw error;
@@ -189,11 +194,13 @@ export class EmployeeShiftsService {
 
   async bulkCreate(dtos: CreateEmployeeShiftDto[]): Promise<EmployeeShift[]> {
     // Tự động tạo schedule_code cho mỗi dto
-    const countSchedules = await this.employeeShiftRepository.count();
-
-    const entities = dtos.map((dto, index) => {
+    const entities = dtos.map((dto) => {
       if (!dto.schedule_code) {
-        dto.schedule_code = `LS${String(countSchedules + index + 1).padStart(3, '0')}`;
+        // Thêm employee_id và số ngẫu nhiên để đảm bảo mã không trùng lặp
+        const randomSuffix = Math.floor(Math.random() * 1000)
+          .toString()
+          .padStart(3, '0');
+        dto.schedule_code = `LS${dto.employee_id}-${randomSuffix}`;
       }
       if (!dto.status) {
         dto.status = ScheduleStatus.PENDING;

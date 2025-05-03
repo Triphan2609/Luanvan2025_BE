@@ -13,15 +13,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET'), // Lấy JWT_SECRET từ biến môi trường
+      secretOrKey: configService.get<string>('jwt.secret'),
     });
   }
 
   async validate(payload: any) {
-    const account = await this.accountsService.findByUsername(payload.username);
+    // Find the account by id (sub) instead of username
+    const account = await this.accountsService.findById(payload.sub);
     if (!account) {
       throw new Error('Tài khoản không tồn tại');
     }
-    return { ...account, role: payload.role };
+    return {
+      id: account.id,
+      username: account.username,
+      fullName: account.fullName,
+      email: account.email,
+      role: payload.role,
+      status: account.status,
+      lastLogin: account.lastLogin,
+    };
   }
 }
