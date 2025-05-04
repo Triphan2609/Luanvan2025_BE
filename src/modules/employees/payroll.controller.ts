@@ -147,8 +147,23 @@ export class PayrollController {
   }
 
   @Get()
-  findAll(@Query() queryDto: QueryPayrollDto) {
-    return this.payrollService.findAll(queryDto);
+  async findAll(@Query() queryDto: QueryPayrollDto) {
+    try {
+      this.logger.debug(
+        `Received request to find all payrolls with queryDto: ${JSON.stringify(queryDto)}`,
+      );
+
+      const payrolls = await this.payrollService.findAll(queryDto);
+
+      this.logger.debug(`Found ${payrolls.length} payrolls`);
+      return payrolls;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : '';
+      this.logger.error(`Error finding payrolls: ${errorMessage}`, errorStack);
+      throw error;
+    }
   }
 
   @Get('stats')

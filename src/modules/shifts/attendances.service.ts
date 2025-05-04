@@ -43,9 +43,11 @@ export class AttendancesService {
     }
 
     // Nếu có employee_shift_id, kiểm tra ca làm việc
+    let employeeShift: EmployeeShift | null = null;
     if (createAttendanceDto.employee_shift_id) {
-      const employeeShift = await this.employeeShiftRepository.findOne({
+      employeeShift = await this.employeeShiftRepository.findOne({
         where: { id: createAttendanceDto.employee_shift_id },
+        relations: ['shift'],
       });
 
       if (!employeeShift) {
@@ -61,16 +63,38 @@ export class AttendancesService {
     // Tính toán số giờ làm việc nếu có check-in và check-out
     if (check_in && check_out) {
       // Hàm tính toán giờ làm việc
-      attendance.working_hours = this.calculateWorkingHours(
-        check_in,
-        check_out,
-      );
+      if (employeeShift && employeeShift.shift) {
+        // Nếu có thông tin ca làm việc, sử dụng thông tin này để tính giờ làm việc
+        const isNightShift =
+          createAttendanceDto.type === AttendanceType.NIGHT_SHIFT ||
+          employeeShift.shift.end_time === '00:00:00' ||
+          employeeShift.shift.start_time === '00:00:00' ||
+          employeeShift.shift.start_time > employeeShift.shift.end_time;
+
+        attendance.working_hours = this.calculateWorkingHoursWithShift(
+          check_in,
+          check_out,
+          employeeShift.shift.start_time,
+          employeeShift.shift.end_time,
+          isNightShift,
+        );
+      } else {
+        // Nếu không có thông tin ca làm việc, sử dụng cách tính thông thường
+        attendance.working_hours = this.calculateWorkingHours(
+          check_in,
+          check_out,
+        );
+      }
 
       // Phân loại và tính toán giờ theo loại
       if (createAttendanceDto.type === AttendanceType.OVERTIME) {
         attendance.overtime_hours = attendance.working_hours;
       } else if (createAttendanceDto.type === AttendanceType.NIGHT_SHIFT) {
+        // Đảm bảo giờ ca đêm được gán chính xác
         attendance.night_shift_hours = attendance.working_hours;
+        // Đảm bảo giờ ca đêm không bị ghi đè khi lưu
+        attendance.overtime_hours = 0;
+        attendance.holiday_hours = 0;
       } else if (createAttendanceDto.type === AttendanceType.HOLIDAY) {
         attendance.holiday_hours = attendance.working_hours;
       }
@@ -320,6 +344,77 @@ export class AttendancesService {
     let workingHours = checkOutTime - checkInTime;
     if (workingHours < 0) {
       workingHours += 24; // Thêm 24 giờ nếu checkout vào ngày hôm sau
+    }
+
+    // Làm tròn đến 0.5 giờ
+    return Math.round(workingHours * 2) / 2;
+  }
+
+  // Hàm tính toán giờ làm việc với thông tin ca
+  private calculateWorkingHoursWithShift(
+    checkIn: string,
+    checkOut: string,
+    shiftStart: string,
+    shiftEnd: string,
+    isNightShift: boolean,
+  ): number {
+    const [checkInHour, checkInMinute] = checkIn.split(':').map(Number);
+    const [checkOutHour, checkOutMinute] = checkOut.split(':').map(Number);
+    const [shiftStartHour, shiftStartMinute] = shiftStart
+      .split(':')
+      .map(Number);
+    const [shiftEndHour, shiftEndMinute] = shiftEnd.split(':').map(Number);
+
+    const checkInTime = checkInHour + checkInMinute / 60;
+    const checkOutTime = checkOutHour + checkOutMinute / 60;
+    const shiftStartTime = shiftStartHour + shiftStartMinute / 60;
+    const shiftEndTime = shiftEndHour + shiftEndMinute / 60;
+
+    let workingHours = 0;
+
+    // Xử lý đặc biệt cho ca tối/đêm (ca qua nửa đêm)
+    if (isNightShift) {
+      // Ca đêm hoặc ca tối kết thúc vào nửa đêm hoặc sau nửa đêm
+      if (shiftEndTime === 0 || shiftStartTime > shiftEndTime) {
+        // Trường hợp ca kết thúc vào nửa đêm (00:00) hoặc sau nửa đêm
+        const totalShiftHours =
+          shiftEndTime === 0
+            ? 24 - shiftStartTime
+            : 24 - shiftStartTime + shiftEndTime;
+
+        // Trường hợp checkout sớm hơn end_time
+        if (
+          checkOutTime < shiftEndTime ||
+          (shiftEndTime === 0 &&
+            checkOutTime < 24 &&
+            checkOutTime >= shiftStartTime)
+        ) {
+          // Checkout sớm trong cùng ngày
+          workingHours = checkOutTime - checkInTime;
+        } else if (
+          checkOutTime > 0 &&
+          checkOutTime <= shiftEndTime &&
+          shiftEndTime > 0
+        ) {
+          // Checkout vào ngày hôm sau nhưng trước khi kết thúc ca
+          workingHours = 24 - checkInTime + checkOutTime;
+        } else {
+          // Checkout đúng giờ hoặc muộn hơn
+          workingHours = totalShiftHours;
+        }
+      } else {
+        // Ca đêm thông thường
+        workingHours = checkOutTime - checkInTime;
+        if (workingHours < 0) {
+          workingHours += 24;
+        }
+      }
+    } else {
+      // Ca bình thường
+      workingHours = checkOutTime - checkInTime;
+      if (workingHours < 0) {
+        workingHours += 24;
+      }
     }
 
     // Làm tròn đến 0.5 giờ

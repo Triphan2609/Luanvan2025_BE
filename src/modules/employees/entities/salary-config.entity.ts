@@ -64,32 +64,49 @@ export class SalaryConfig {
   @Column({ type: 'float', default: 2.0 })
   holiday_multiplier: number; // Hệ số lương ngày lễ
 
+  // Phụ cấp không tính thuế
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  meal_allowance: number; // Phụ cấp ăn uống
+  meal_allowance: number; // Phụ cấp ăn ca (không tính thuế nếu <= 730,000)
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  transport_allowance: number; // Phụ cấp đi lại
+  transport_allowance: number; // Phụ cấp đi lại (không tính thuế nếu theo thực tế)
+
+  // Phụ cấp có tính thuế
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  housing_allowance: number; // Phụ cấp nhà ở (có tính thuế nếu vượt mức)
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  housing_allowance: number; // Phụ cấp nhà ở
+  position_allowance: number; // Phụ cấp chức vụ (có tính thuế)
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  position_allowance: number; // Phụ cấp chức vụ
+  responsibility_allowance: number; // Phụ cấp trách nhiệm (có tính thuế)
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  phone_allowance: number; // Phụ cấp điện thoại (một phần có thể chịu thuế)
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   attendance_bonus: number; // Thưởng chuyên cần
 
+  // Cấu hình thuế và bảo hiểm
   @Column({ type: 'float', default: 0.1 })
   tax_rate: number; // Thuế suất TNCN
 
   @Column({ type: 'float', default: 0.105 })
   insurance_rate: number; // Tỉ lệ BHXH, BHYT, BHTN
 
+  // Cấu hình giờ làm việc
   @Column({ type: 'int', default: 8 })
   standard_hours_per_day: number; // Số giờ làm việc tiêu chuẩn mỗi ngày
 
   @Column({ type: 'int', default: 22 })
   standard_days_per_month: number; // Số ngày làm việc tiêu chuẩn mỗi tháng
+
+  // Các cấu hình bổ sung
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 730000 })
+  meal_allowance_tax_threshold: number; // Ngưỡng tính thuế cho phụ cấp ăn ca
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 1000000 })
+  phone_allowance_tax_threshold: number; // Ngưỡng tính thuế cho phụ cấp điện thoại
 
   @Column({ default: true })
   is_active: boolean;

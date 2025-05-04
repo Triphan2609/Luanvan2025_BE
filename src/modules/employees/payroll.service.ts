@@ -216,19 +216,45 @@ export class PayrollService {
 
         // Tính lương ca đêm với kiểm tra giá trị
         if (finalNightShiftHours > 0) {
-          // Debug logging
           this.logger.debug(
             `Night shift calculation: ${finalNightShiftHours} hours * ${validHourlyRate} hourly rate * ${validNightShiftMultiplier} multiplier`,
           );
+          // Đảm bảo đủ tham số cho phép tính
+          if (validHourlyRate <= 0) {
+            this.logger.warn(
+              `Hourly rate is too low or invalid: ${validHourlyRate}. Using minimum hourly rate.`,
+            );
+            // Sử dụng mức lương giờ tối thiểu nếu hourlyRate không hợp lệ
+            const minimumHourlyRate = 25000; // Giá trị mặc định tối thiểu
+
+            // Lương ca đêm = (giờ làm ca đêm) * (lương giờ) * (hệ số)
+            nightShiftPay =
+              finalNightShiftHours *
+              minimumHourlyRate *
+              validNightShiftMultiplier;
+
+            this.logger.debug(
+              `Recalculated night shift pay using minimum hourly rate: ${finalNightShiftHours} hours * ${minimumHourlyRate} rate * ${validNightShiftMultiplier} = ${nightShiftPay}`,
+            );
+          } else {
+            // Lương ca đêm = (giờ làm ca đêm) * (lương giờ) * (hệ số)
+            nightShiftPay =
+              finalNightShiftHours *
+              validHourlyRate *
+              validNightShiftMultiplier;
+
+            this.logger.debug(
+              `Recalculated night shift pay (monthly): ${finalNightShiftHours} hours * ${validHourlyRate} rate * ${validNightShiftMultiplier} = ${nightShiftPay}`,
+            );
+          }
+        } else {
+          nightShiftPay = 0;
         }
 
         overtimePay =
           finalOvertimeHours *
           validHourlyRate *
           Number(salaryConfig.overtime_multiplier || 1.5);
-
-        nightShiftPay =
-          finalNightShiftHours * validHourlyRate * validNightShiftMultiplier;
 
         holidayPay =
           finalHolidayHours *
@@ -240,6 +266,23 @@ export class PayrollService {
       case SalaryType.HOURLY: {
         // Lương giờ
         const hourlyRate = Number(salaryConfig.hourly_rate) || 0;
+
+        // Kiểm tra xem hourlyRate có giá trị hợp lệ không
+        this.logger.debug(
+          `HOURLY type calculation with hourly_rate: ${hourlyRate}`,
+        );
+
+        // Nếu hourly_rate chưa được thiết lập, tính toán dựa trên base_salary
+        const effectiveHourlyRate =
+          hourlyRate > 0
+            ? hourlyRate
+            : baseSalary /
+              (standardHoursPerDay *
+                (salaryConfig.standard_days_per_month || 22));
+
+        this.logger.debug(
+          `Effective hourly rate calculated: ${effectiveHourlyRate}`,
+        );
 
         // Calculate minimum working hours if no actual attendance data
         let workingHoursToCalculate = finalTotalWorkingHours;
@@ -263,10 +306,12 @@ export class PayrollService {
           0.1,
         );
         normalSalary =
-          standardHours > 0 ? standardHours * hourlyRate : hourlyRate;
+          standardHours > 0
+            ? standardHours * effectiveHourlyRate
+            : effectiveHourlyRate;
 
         // Đảm bảo hourlyRate là một số dương
-        const validHourlyRate = Math.max(hourlyRate, 0);
+        const validHourlyRate = Math.max(effectiveHourlyRate, 0);
 
         // Tính toán hệ số từ cấu hình hoặc giá trị trực tiếp từ DTO
         const nightShiftMultiplier = Number(
@@ -284,8 +329,39 @@ export class PayrollService {
           validHourlyRate *
           Number(salaryConfig.overtime_multiplier || 1.5);
 
-        nightShiftPay =
-          finalNightShiftHours * validHourlyRate * validNightShiftMultiplier;
+        // Tính lương ca đêm với kiểm tra giá trị
+        if (finalNightShiftHours > 0) {
+          this.logger.debug(
+            `Night shift calculation (hourly): ${finalNightShiftHours} hours * ${validHourlyRate} hourly rate * ${validNightShiftMultiplier} multiplier`,
+          );
+          // Đảm bảo đủ tham số cho phép tính
+          if (validHourlyRate <= 0) {
+            this.logger.warn(
+              `Hourly rate is too low or invalid: ${validHourlyRate}. Using minimum hourly rate.`,
+            );
+            // Sử dụng mức lương giờ tối thiểu nếu hourlyRate không hợp lệ
+            const minimumHourlyRate = 25000; // Giá trị mặc định tối thiểu
+            nightShiftPay =
+              finalNightShiftHours *
+              minimumHourlyRate *
+              validNightShiftMultiplier;
+
+            this.logger.debug(
+              `Recalculated night shift pay using minimum hourly rate: ${finalNightShiftHours} hours * ${minimumHourlyRate} rate * ${validNightShiftMultiplier} = ${nightShiftPay}`,
+            );
+          } else {
+            nightShiftPay =
+              finalNightShiftHours *
+              validHourlyRate *
+              validNightShiftMultiplier;
+
+            this.logger.debug(
+              `Recalculated night shift pay (hourly): ${finalNightShiftHours} hours * ${validHourlyRate} rate * ${validNightShiftMultiplier} = ${nightShiftPay}`,
+            );
+          }
+        } else {
+          nightShiftPay = 0;
+        }
 
         holidayPay =
           finalHolidayHours *
@@ -333,10 +409,42 @@ export class PayrollService {
           validHourlyShiftRate *
           Number(salaryConfig.overtime_multiplier || 1.5);
 
-        nightShiftPay =
-          finalNightShiftHours *
-          validHourlyShiftRate *
-          validNightShiftMultiplier;
+        // Tính lương ca đêm với kiểm tra giá trị
+        if (finalNightShiftHours > 0) {
+          this.logger.debug(
+            `Night shift calculation (shift): ${finalNightShiftHours} hours * ${validHourlyShiftRate} hourly rate * ${validNightShiftMultiplier} multiplier`,
+          );
+          // Đảm bảo đủ tham số cho phép tính
+          if (validHourlyShiftRate <= 0) {
+            this.logger.warn(
+              `Hourly shift rate is too low or invalid: ${validHourlyShiftRate}. Using shift rate.`,
+            );
+            // Sử dụng mức lương ca tính theo giờ thay thế
+            const alternativeRate = shiftRate / 8; // Giả sử 1 ca làm 8 giờ
+
+            // Lương ca đêm = (giờ làm ca đêm) * (lương giờ) * (hệ số)
+            nightShiftPay =
+              finalNightShiftHours *
+              alternativeRate *
+              validNightShiftMultiplier;
+
+            this.logger.debug(
+              `Recalculated night shift pay using alternative shift rate: ${finalNightShiftHours} hours * ${alternativeRate} rate * ${validNightShiftMultiplier} = ${nightShiftPay}`,
+            );
+          } else {
+            // Lương ca đêm = (giờ làm ca đêm) * (lương giờ) * (hệ số)
+            nightShiftPay =
+              finalNightShiftHours *
+              validHourlyShiftRate *
+              validNightShiftMultiplier;
+
+            this.logger.debug(
+              `Recalculated night shift pay (shift): ${finalNightShiftHours} hours * ${validHourlyShiftRate} rate * ${validNightShiftMultiplier} = ${nightShiftPay}`,
+            );
+          }
+        } else {
+          nightShiftPay = 0;
+        }
 
         holidayPay =
           finalHolidayHours *
@@ -495,7 +603,7 @@ export class PayrollService {
         createPayrollDto,
       );
 
-      // Phụ cấp
+      // Phụ cấp không tính thuế
       const mealAllowance =
         createPayrollDto.allowances?.meal_allowance ??
         salaryConfig.meal_allowance ??
@@ -504,6 +612,8 @@ export class PayrollService {
         createPayrollDto.allowances?.transport_allowance ??
         salaryConfig.transport_allowance ??
         0;
+
+      // Phụ cấp có tính thuế
       const housingAllowance =
         createPayrollDto.allowances?.housing_allowance ??
         salaryConfig.housing_allowance ??
@@ -512,6 +622,16 @@ export class PayrollService {
         createPayrollDto.allowances?.position_allowance ??
         salaryConfig.position_allowance ??
         0;
+      const responsibilityAllowance =
+        createPayrollDto.allowances?.responsibility_allowance ??
+        salaryConfig.responsibility_allowance ??
+        0;
+      const phoneAllowance =
+        createPayrollDto.allowances?.phone_allowance ??
+        salaryConfig.phone_allowance ??
+        0;
+
+      // Thưởng
       const attendanceBonus =
         createPayrollDto.allowances?.attendance_bonus ??
         salaryConfig.attendance_bonus ??
@@ -519,27 +639,85 @@ export class PayrollService {
       const performanceBonus =
         createPayrollDto.allowances?.performance_bonus ?? 0;
 
-      // Tổng phụ cấp
-      const totalAllowances =
-        mealAllowance +
-        transportAllowance +
-        housingAllowance +
-        positionAllowance +
-        attendanceBonus +
-        performanceBonus;
+      // Ngưỡng miễn thuế cho phụ cấp
+      const mealAllowanceTaxThreshold =
+        salaryConfig.meal_allowance_tax_threshold || 730000;
+      const phoneAllowanceTaxThreshold =
+        salaryConfig.phone_allowance_tax_threshold || 1000000;
 
-      // Tổng lương gộp
-      const grossPay =
+      // Tính phần phụ cấp tính thuế và không tính thuế
+      let taxableMealAllowance = 0;
+      let nonTaxableMealAllowance = Number(mealAllowance);
+      if (Number(mealAllowance) > mealAllowanceTaxThreshold) {
+        taxableMealAllowance =
+          Number(mealAllowance) - mealAllowanceTaxThreshold;
+        nonTaxableMealAllowance = mealAllowanceTaxThreshold;
+      }
+
+      let taxablePhoneAllowance = 0;
+      let nonTaxablePhoneAllowance = Number(phoneAllowance);
+      if (Number(phoneAllowance) > phoneAllowanceTaxThreshold) {
+        taxablePhoneAllowance =
+          Number(phoneAllowance) - phoneAllowanceTaxThreshold;
+        nonTaxablePhoneAllowance = phoneAllowanceTaxThreshold;
+      }
+
+      // Tổng phụ cấp tính thuế
+      const taxableAllowances =
+        taxableMealAllowance +
+        taxablePhoneAllowance +
+        Number(housingAllowance) +
+        Number(positionAllowance) +
+        Number(responsibilityAllowance) +
+        Number(attendanceBonus) +
+        Number(performanceBonus);
+
+      // Tổng phụ cấp không tính thuế
+      const nonTaxableAllowances =
+        nonTaxableMealAllowance +
+        nonTaxablePhoneAllowance +
+        Number(transportAllowance);
+
+      // Tổng phụ cấp
+      const totalAllowances = taxableAllowances + nonTaxableAllowances;
+
+      // Log phụ cấp để debug
+      this.logger.debug(
+        `Phụ cấp:
+        Ăn ca (không tính thuế)=${nonTaxableMealAllowance}, (tính thuế)=${taxableMealAllowance}
+        Đi lại=${transportAllowance}
+        Điện thoại (không tính thuế)=${nonTaxablePhoneAllowance}, (tính thuế)=${taxablePhoneAllowance}
+        Nhà ở=${housingAllowance}
+        Chức vụ=${positionAllowance}
+        Trách nhiệm=${responsibilityAllowance}
+        Chuyên cần=${attendanceBonus}
+        Hiệu suất=${performanceBonus}
+        Tổng phụ cấp tính thuế=${taxableAllowances}
+        Tổng phụ cấp không tính thuế=${nonTaxableAllowances}
+        Tổng phụ cấp=${totalAllowances}`,
+      );
+
+      // Tổng lương gộp (chịu thuế)
+      const grossPayTaxable =
         salaryCalculation.normalSalary +
         salaryCalculation.overtimePay +
         salaryCalculation.nightShiftPay +
         salaryCalculation.holidayPay +
-        totalAllowances;
+        taxableAllowances;
+
+      // Tổng lương gộp (bao gồm cả phần không tính thuế)
+      const grossPay = grossPayTaxable + nonTaxableAllowances;
 
       // Ensure grossPay is a valid number
       const validatedGrossPay =
         !isNaN(grossPay) && grossPay > 0
           ? grossPay
+          : salaryCalculation.normalSalary;
+
+      // Đảm bảo validatedGrossPayTaxable là số hợp lệ
+      const validatedGrossPayTaxable =
+        !isNaN(grossPayTaxable) && grossPayTaxable > 0
+          ? grossPayTaxable
           : salaryCalculation.normalSalary;
 
       // Kiểm tra giá trị tính toán lương ca đêm
@@ -588,11 +766,12 @@ export class PayrollService {
           : 0;
 
       // Tính thuế và bảo hiểm - ensure values are numeric and not NaN
-      const tax = !isNaN(validatedGrossPay * taxRate)
-        ? validatedGrossPay * taxRate
+      // Lưu ý: Thuế chỉ tính trên phần lương chịu thuế (validatedGrossPayTaxable)
+      const tax = !isNaN(validatedGrossPayTaxable * taxRate)
+        ? validatedGrossPayTaxable * taxRate
         : 0;
-      const insurance = !isNaN(validatedGrossPay * insuranceRate)
-        ? validatedGrossPay * insuranceRate
+      const insurance = !isNaN(validatedGrossPayTaxable * insuranceRate)
+        ? validatedGrossPayTaxable * insuranceRate
         : 0;
 
       // Tổng khấu trừ - check for NaN
@@ -664,13 +843,21 @@ export class PayrollService {
         overtime_pay: sanitizeNumber(salaryCalculation.overtimePay),
         night_shift_pay: sanitizeNumber(salaryCalculation.nightShiftPay),
         holiday_pay: sanitizeNumber(salaryCalculation.holidayPay),
-        meal_allowance: sanitizeNumber(mealAllowance),
+        meal_allowance: sanitizeNumber(
+          nonTaxableMealAllowance + taxableMealAllowance,
+        ),
         transport_allowance: sanitizeNumber(transportAllowance),
+        phone_allowance: sanitizeNumber(
+          nonTaxablePhoneAllowance + taxablePhoneAllowance,
+        ),
         housing_allowance: sanitizeNumber(housingAllowance),
         position_allowance: sanitizeNumber(positionAllowance),
+        responsibility_allowance: sanitizeNumber(responsibilityAllowance),
         attendance_bonus: sanitizeNumber(attendanceBonus),
         performance_bonus: sanitizeNumber(performanceBonus),
         allowances: sanitizeNumber(totalAllowances),
+        taxable_allowances: sanitizeNumber(taxableAllowances),
+        non_taxable_allowances: sanitizeNumber(nonTaxableAllowances),
         tax: sanitizeNumber(tax),
         tax_rate: sanitizeNumber(taxRate),
         insurance: sanitizeNumber(insurance),
@@ -685,20 +872,44 @@ export class PayrollService {
         attendance_data: JSON.stringify(attendances),
       });
 
-      // Final validation to ensure gross_pay and net_pay are not zero if normal_salary has a value
-      if (payrollEntity.gross_pay === 0 && payrollEntity.normal_salary > 0) {
-        payrollEntity.gross_pay =
-          payrollEntity.normal_salary +
-          payrollEntity.overtime_pay +
-          payrollEntity.night_shift_pay +
-          payrollEntity.holiday_pay +
-          payrollEntity.allowances;
-      }
+      // Log để kiểm tra giá trị trước khi lưu
+      this.logger.debug(
+        `Gross pay before validation: ${payrollEntity.gross_pay}`,
+      );
+      this.logger.debug(`Night shift pay: ${payrollEntity.night_shift_pay}`);
+      this.logger.debug(`Total allowances: ${payrollEntity.allowances}`);
+      this.logger.debug(`Meal allowance: ${payrollEntity.meal_allowance}`);
 
-      if (payrollEntity.net_pay === 0 && payrollEntity.gross_pay > 0) {
-        payrollEntity.net_pay =
-          payrollEntity.gross_pay - payrollEntity.deductions;
-      }
+      // Đảm bảo tổng lương gộp bao gồm tất cả các khoản
+      payrollEntity.gross_pay =
+        sanitizeNumber(payrollEntity.normal_salary) +
+        sanitizeNumber(payrollEntity.overtime_pay) +
+        sanitizeNumber(payrollEntity.night_shift_pay) +
+        sanitizeNumber(payrollEntity.holiday_pay) +
+        sanitizeNumber(payrollEntity.allowances);
+
+      // Kiểm tra và log chi tiết đảm bảo các khoản phụ cấp được tính vào lương gộp
+      this.logger.debug(`Gross pay after fix: ${payrollEntity.gross_pay}`);
+      this.logger.debug(`Details of gross_pay components:`);
+      this.logger.debug(`Normal salary: ${payrollEntity.normal_salary}`);
+      this.logger.debug(`Overtime pay: ${payrollEntity.overtime_pay}`);
+      this.logger.debug(`Night shift pay: ${payrollEntity.night_shift_pay}`);
+      this.logger.debug(`Holiday pay: ${payrollEntity.holiday_pay}`);
+      this.logger.debug(`Allowances: ${payrollEntity.allowances}`);
+      this.logger.debug(`  - Meal: ${payrollEntity.meal_allowance}`);
+      this.logger.debug(`  - Transport: ${payrollEntity.transport_allowance}`);
+      this.logger.debug(`  - Phone: ${payrollEntity.phone_allowance}`);
+      this.logger.debug(`  - Housing: ${payrollEntity.housing_allowance}`);
+      this.logger.debug(`  - Position: ${payrollEntity.position_allowance}`);
+      this.logger.debug(
+        `  - Responsibility: ${payrollEntity.responsibility_allowance}`,
+      );
+      this.logger.debug(`  - Attendance: ${payrollEntity.attendance_bonus}`);
+      this.logger.debug(`  - Performance: ${payrollEntity.performance_bonus}`);
+
+      // Tính lại lương thực lãnh
+      payrollEntity.net_pay =
+        payrollEntity.gross_pay - payrollEntity.deductions;
 
       // Save with try-catch to handle unique constraint errors
       try {
@@ -745,41 +956,126 @@ export class PayrollService {
   }
 
   async findAll(queryDto: QueryPayrollDto): Promise<Payroll[]> {
-    const where: FindOptionsWhere<Payroll> = {};
+    this.logger.debug(
+      `Finding payrolls with filters: ${JSON.stringify(queryDto)}`,
+    );
 
-    // Apply filters
-    if (queryDto.employee_id) {
-      where.employee_id = queryDto.employee_id;
-    }
+    try {
+      const where: FindOptionsWhere<Payroll> = {};
 
-    if (queryDto.department_id) {
-      where.employee = { department: { id: queryDto.department_id } };
-    }
+      // Apply filters
+      if (queryDto.employee_id) {
+        where.employee_id = queryDto.employee_id;
+      }
 
-    if (queryDto.start_date && queryDto.end_date) {
-      where.period_start = Between(
-        new Date(queryDto.start_date),
-        new Date(queryDto.end_date),
+      if (queryDto.department_id) {
+        where.employee = { department: { id: queryDto.department_id } };
+      }
+
+      // Fix date filtering to properly include payrolls in the date range
+      if (queryDto.start_date && queryDto.end_date) {
+        // Sửa đổi cách xử lý để mở rộng phạm vi tìm kiếm
+        const startDate = new Date(queryDto.start_date);
+        const endDate = new Date(queryDto.end_date);
+
+        // Đảm bảo endDate được đặt vào cuối ngày để bao gồm tất cả payrolls
+        endDate.setHours(23, 59, 59, 999);
+
+        this.logger.debug(
+          `Date range filter: ${startDate.toISOString()} to ${endDate.toISOString()}`,
+        );
+
+        // Thay đổi cách lọc để bắt payroll có period_start HOẶC period_end nằm trong khoảng
+        where.period_start = Between(startDate, endDate);
+
+        // Ghi log để debug
+        this.logger.debug(
+          `Using date filter: period_start Between ${startDate.toISOString()} and ${endDate.toISOString()}`,
+        );
+      }
+
+      if (queryDto.period_type) {
+        where.period_type = queryDto.period_type;
+      }
+
+      if (queryDto.status) {
+        where.status = queryDto.status;
+      }
+
+      if (queryDto.search) {
+        where.employee = { name: Like(`%${queryDto.search}%`) };
+      }
+
+      this.logger.debug(`Final query conditions: ${JSON.stringify(where)}`);
+
+      // Sử dụng query Builder để có nhiều kiểm soát hơn
+      let query = this.payrollRepository
+        .createQueryBuilder('payroll')
+        .leftJoinAndSelect('payroll.employee', 'employee')
+        .leftJoinAndSelect('employee.department', 'department')
+        .leftJoinAndSelect('employee.role', 'role');
+
+      // Áp dụng các điều kiện
+      if (queryDto.employee_id) {
+        query = query.andWhere('payroll.employee_id = :employeeId', {
+          employeeId: queryDto.employee_id,
+        });
+      }
+
+      if (queryDto.department_id) {
+        query = query.andWhere('employee.department_id = :departmentId', {
+          departmentId: queryDto.department_id,
+        });
+      }
+
+      if (queryDto.start_date && queryDto.end_date) {
+        const startDate = new Date(queryDto.start_date);
+        const endDate = new Date(queryDto.end_date);
+        endDate.setHours(23, 59, 59, 999);
+
+        query = query.andWhere(
+          '(payroll.period_start BETWEEN :startDate AND :endDate OR payroll.period_end BETWEEN :startDate AND :endDate)',
+          { startDate, endDate },
+        );
+      }
+
+      if (queryDto.period_type) {
+        query = query.andWhere('payroll.period_type = :periodType', {
+          periodType: queryDto.period_type,
+        });
+      }
+
+      if (queryDto.status) {
+        query = query.andWhere('payroll.status = :status', {
+          status: queryDto.status,
+        });
+      }
+
+      if (queryDto.search) {
+        query = query.andWhere('employee.name LIKE :search', {
+          search: `%${queryDto.search}%`,
+        });
+      }
+
+      // Thêm sắp xếp
+      query = query
+        .orderBy('payroll.period_start', 'DESC')
+        .addOrderBy('payroll.created_at', 'DESC');
+
+      // Thực hiện truy vấn
+      const payrolls = await query.getMany();
+
+      this.logger.debug(
+        `Found ${payrolls.length} payrolls with query builder approach`,
+      );
+      return payrolls;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      this.logger.error(`Error fetching payrolls: ${errorMessage}`);
+      throw new InternalServerErrorException(
+        `Không thể lấy danh sách bảng lương: ${errorMessage}`,
       );
     }
-
-    if (queryDto.period_type) {
-      where.period_type = queryDto.period_type;
-    }
-
-    if (queryDto.status) {
-      where.status = queryDto.status;
-    }
-
-    if (queryDto.search) {
-      where.employee = { name: Like(`%${queryDto.search}%`) };
-    }
-
-    return this.payrollRepository.find({
-      where,
-      relations: ['employee', 'employee.department', 'employee.role'],
-      order: { period_start: 'DESC', created_at: 'DESC' },
-    });
   }
 
   async findOne(id: number): Promise<Payroll> {
@@ -941,13 +1237,32 @@ export class PayrollService {
     departmentId?: number,
   ) {
     try {
-      // Create base query for payrolls within date range
+      this.logger.debug(
+        `Getting payroll stats for period ${startDate} to ${endDate}`,
+      );
+
+      // Create base query for payrolls within date range - sử dụng logic tương tự như findAll
       const query = this.payrollRepository
         .createQueryBuilder('payroll')
         .leftJoinAndSelect('payroll.employee', 'employee')
-        .leftJoinAndSelect('employee.department', 'department')
-        .where('payroll.period_start >= :startDate', { startDate })
-        .andWhere('payroll.period_end <= :endDate', { endDate });
+        .leftJoinAndSelect('employee.department', 'department');
+
+      // Parse dates
+      const startDateObj = new Date(startDate);
+      const endDateObj = new Date(endDate);
+
+      // Make sure endDate is set to the end of the day
+      endDateObj.setHours(23, 59, 59, 999);
+
+      this.logger.debug(
+        `Using date range: ${startDateObj.toISOString()} to ${endDateObj.toISOString()}`,
+      );
+
+      // Sửa điều kiện truy vấn để khớp với findAll
+      query.where(
+        '(payroll.period_start BETWEEN :startDate AND :endDate OR payroll.period_end BETWEEN :startDate AND :endDate)',
+        { startDate: startDateObj, endDate: endDateObj },
+      );
 
       // Add department filter if specified
       if (departmentId) {
@@ -956,8 +1271,15 @@ export class PayrollService {
         });
       }
 
+      // Log the generated SQL để debug
+      const sqlString = query.getQueryAndParameters();
+      this.logger.debug(`Generated stats query: ${JSON.stringify(sqlString)}`);
+
       // Get all payrolls matching criteria
       const payrolls = await query.getMany();
+      this.logger.debug(
+        `Found ${payrolls.length} payrolls for stats calculation`,
+      );
 
       // Count unique employees
       const uniqueEmployeeIds = new Set<number>();
@@ -998,7 +1320,7 @@ export class PayrollService {
         byDepartment[deptName] = (byDepartment[deptName] || 0) + 1;
       });
 
-      return {
+      const result = {
         totalPayrolls: payrolls.length,
         totalEmployees: uniqueEmployeeIds.size,
         totalGrossPay,
@@ -1006,6 +1328,9 @@ export class PayrollService {
         byStatus,
         byDepartment,
       };
+
+      this.logger.debug(`Stats result: ${JSON.stringify(result)}`);
+      return result;
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -1082,17 +1407,35 @@ export class PayrollService {
     endDate: string,
   ) {
     try {
+      this.logger.debug(
+        `Getting payrolls for employee ${employeeId} from ${startDate} to ${endDate}`,
+      );
+
+      // Parse dates
+      const startDateObj = new Date(startDate);
+      const endDateObj = new Date(endDate);
+
+      // Make sure endDate is set to the end of the day
+      endDateObj.setHours(23, 59, 59, 999);
+
       const query = this.payrollRepository
         .createQueryBuilder('payroll')
         .leftJoinAndSelect('payroll.employee', 'employee')
         .leftJoinAndSelect('employee.department', 'department')
         .leftJoinAndSelect('employee.role', 'role')
         .where('payroll.employee_id = :employeeId', { employeeId })
-        .andWhere('payroll.period_start >= :startDate', { startDate })
-        .andWhere('payroll.period_end <= :endDate', { endDate })
+        .andWhere(
+          '(payroll.period_start BETWEEN :startDate AND :endDate OR payroll.period_end BETWEEN :startDate AND :endDate)',
+          { startDate: startDateObj, endDate: endDateObj },
+        )
         .orderBy('payroll.period_start', 'DESC');
 
-      return await query.getMany();
+      const payrolls = await query.getMany();
+      this.logger.debug(
+        `Found ${payrolls.length} payrolls for employee ${employeeId}`,
+      );
+
+      return payrolls;
     } catch (error) {
       this.logger.error(
         'Error getting employee payrolls',
@@ -1108,17 +1451,35 @@ export class PayrollService {
     endDate: string,
   ) {
     try {
+      this.logger.debug(
+        `Getting payrolls for department ${departmentId} from ${startDate} to ${endDate}`,
+      );
+
+      // Parse dates
+      const startDateObj = new Date(startDate);
+      const endDateObj = new Date(endDate);
+
+      // Make sure endDate is set to the end of the day
+      endDateObj.setHours(23, 59, 59, 999);
+
       const query = this.payrollRepository
         .createQueryBuilder('payroll')
         .leftJoinAndSelect('payroll.employee', 'employee')
         .leftJoinAndSelect('employee.department', 'department')
         .leftJoinAndSelect('employee.role', 'role')
         .where('employee.department_id = :departmentId', { departmentId })
-        .andWhere('payroll.period_start >= :startDate', { startDate })
-        .andWhere('payroll.period_end <= :endDate', { endDate })
+        .andWhere(
+          '(payroll.period_start BETWEEN :startDate AND :endDate OR payroll.period_end BETWEEN :startDate AND :endDate)',
+          { startDate: startDateObj, endDate: endDateObj },
+        )
         .orderBy('payroll.period_start', 'DESC');
 
-      return await query.getMany();
+      const payrolls = await query.getMany();
+      this.logger.debug(
+        `Found ${payrolls.length} payrolls for department ${departmentId}`,
+      );
+
+      return payrolls;
     } catch (error) {
       this.logger.error(
         'Error getting department payrolls',
@@ -1412,11 +1773,15 @@ export class PayrollService {
           transport_allowance: 0,
           housing_allowance: 0,
           position_allowance: 0,
+          responsibility_allowance: 0,
+          phone_allowance: 0,
           attendance_bonus: 0,
           tax_rate: 0.1,
           insurance_rate: 0.105,
           standard_hours_per_day: 8,
           standard_days_per_month: 22,
+          meal_allowance_tax_threshold: 730000,
+          phone_allowance_tax_threshold: 1000000,
           is_active: true,
           description: '',
           created_at: new Date(),

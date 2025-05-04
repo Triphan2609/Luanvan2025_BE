@@ -121,16 +121,28 @@ export class Payroll {
   allowances: number; // Tổng phụ cấp
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
-  meal_allowance: number; // Phụ cấp ăn uống
+  taxable_allowances: number; // Tổng phụ cấp tính thuế
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
-  transport_allowance: number; // Phụ cấp đi lại
+  non_taxable_allowances: number; // Tổng phụ cấp không tính thuế
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
-  housing_allowance: number; // Phụ cấp nhà ở
+  meal_allowance: number; // Phụ cấp ăn ca (không tính thuế nếu <= 730,000)
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
-  position_allowance: number; // Phụ cấp chức vụ
+  transport_allowance: number; // Phụ cấp đi lại (không tính thuế nếu theo thực tế)
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  housing_allowance: number; // Phụ cấp nhà ở (có tính thuế nếu vượt mức)
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  position_allowance: number; // Phụ cấp chức vụ (có tính thuế)
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  responsibility_allowance: number; // Phụ cấp trách nhiệm (có tính thuế)
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  phone_allowance: number; // Phụ cấp điện thoại (một phần có thể chịu thuế)
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   attendance_bonus: number; // Tiền thưởng chuyên cần

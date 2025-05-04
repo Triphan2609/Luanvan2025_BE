@@ -36,6 +36,16 @@ class PayrollAllowanceDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  responsibility_allowance?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  phone_allowance?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   attendance_bonus?: number;
 
   @IsOptional()
