@@ -9,6 +9,7 @@ import {
 import { Department } from '../../departments/entities/department.entity';
 import { RoleEmployee } from '../../roles_employee/entities/role-employee.entity';
 import { EmployeeShift } from '../../shifts/entities/employee-shift.entity';
+import { Branch } from '../../branches/entities/branch.entity';
 
 @Entity('employees')
 export class Employee {
@@ -46,6 +47,10 @@ export class Employee {
   @ManyToOne(() => RoleEmployee, (role) => role.employees)
   @JoinColumn({ name: 'role_id' })
   role: RoleEmployee;
+
+  @ManyToOne(() => Branch)
+  @JoinColumn({ name: 'branch_id' })
+  branch: Branch;
 
   @Column({
     type: 'enum',

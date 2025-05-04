@@ -19,13 +19,22 @@ export class DepartmentsService {
 
   async findAll(): Promise<Department[]> {
     return this.departmentRepository.find({
-      relations: ['employees'],
+      relations: ['employees', 'branch'],
+    });
+  }
+
+  async findByBranch(branchId: number): Promise<Department[]> {
+    return this.departmentRepository.find({
+      where: { branch_id: branchId },
+      relations: ['branch'],
+      order: { name: 'ASC' },
     });
   }
 
   async findOne(id: number): Promise<Department> {
     const department = await this.departmentRepository.findOne({
       where: { id },
+      relations: ['branch'],
     });
     if (!department) {
       throw new NotFoundException('Department not found');

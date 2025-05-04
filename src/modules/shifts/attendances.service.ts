@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, Like, FindOptionsWhere } from 'typeorm';
+import { Repository } from 'typeorm';
 import {
   Attendance,
   AttendanceStatus,
@@ -143,47 +143,64 @@ export class AttendancesService {
   }
 
   async findAll(queryDto: QueryAttendanceDto): Promise<Attendance[]> {
-    const where: FindOptionsWhere<Attendance> = {};
+    // Create a query builder instead of using complex FindOptionsWhere with spread operators
+    const query = this.attendanceRepository
+      .createQueryBuilder('attendance')
+      .leftJoinAndSelect('attendance.employee', 'employee')
+      .leftJoinAndSelect('employee.department', 'department')
+      .leftJoinAndSelect('employee.role', 'role')
+      .leftJoinAndSelect('employee.branch', 'branch')
+      .leftJoinAndSelect('attendance.employeeShift', 'employeeShift')
+      .leftJoinAndSelect('employeeShift.shift', 'shift');
 
     // Apply filters
     if (queryDto.employee_id) {
-      where.employee_id = queryDto.employee_id;
+      query.andWhere('attendance.employee_id = :employeeId', {
+        employeeId: queryDto.employee_id,
+      });
     }
 
     if (queryDto.department_id) {
-      where.employee = { department: { id: queryDto.department_id } };
+      query.andWhere('employee.department_id = :departmentId', {
+        departmentId: queryDto.department_id,
+      });
+    }
+
+    if (queryDto.branch_id) {
+      query.andWhere('employee.branch_id = :branchId', {
+        branchId: queryDto.branch_id,
+      });
     }
 
     if (queryDto.start_date && queryDto.end_date) {
-      where.date = Between(
-        new Date(queryDto.start_date),
-        new Date(queryDto.end_date),
-      );
+      query.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
+        startDate: new Date(queryDto.start_date),
+        endDate: new Date(queryDto.end_date),
+      });
     }
 
     if (queryDto.type) {
-      where.type = queryDto.type;
+      query.andWhere('attendance.type = :type', { type: queryDto.type });
     }
 
     if (queryDto.status) {
-      where.status = queryDto.status;
+      query.andWhere('attendance.status = :status', {
+        status: queryDto.status,
+      });
     }
 
     if (queryDto.search) {
-      where.employee = { name: Like(`%${queryDto.search}%`) };
+      query.andWhere('employee.name LIKE :search', {
+        search: `%${queryDto.search}%`,
+      });
     }
 
-    return this.attendanceRepository.find({
-      where,
-      relations: [
-        'employee',
-        'employee.department',
-        'employee.role',
-        'employeeShift',
-        'employeeShift.shift',
-      ],
-      order: { date: 'DESC', created_at: 'DESC' },
-    });
+    // Add ordering
+    query
+      .orderBy('attendance.date', 'DESC')
+      .addOrderBy('attendance.created_at', 'DESC');
+
+    return query.getMany();
   }
 
   async findOne(id: number): Promise<Attendance> {
@@ -252,6 +269,7 @@ export class AttendancesService {
     startDate: string,
     endDate: string,
     departmentId?: number,
+    branchId?: number,
   ): Promise<{
     totalAttendances: number;
     totalEmployees: number;
@@ -260,22 +278,32 @@ export class AttendancesService {
     byType: Record<AttendanceType, number>;
     byStatus: Record<AttendanceStatus, number>;
     byDepartment: Record<string, { count: number; hours: number }>;
+    byBranch?: Record<string, { count: number; hours: number }>;
   }> {
-    // Build query options
-    const whereCondition: FindOptionsWhere<Attendance> = {
-      date: Between(new Date(startDate), new Date(endDate)),
-    };
+    // Use query builder instead of complex where conditions
+    const query = this.attendanceRepository
+      .createQueryBuilder('attendance')
+      .leftJoinAndSelect('attendance.employee', 'employee')
+      .leftJoinAndSelect('employee.department', 'department')
+      .leftJoinAndSelect('employee.branch', 'branch')
+      .where('attendance.date BETWEEN :startDate AND :endDate', {
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+      });
 
     if (departmentId) {
-      whereCondition.employee = {
-        department: { id: departmentId },
-      } as { department: { id: number } };
+      query.andWhere('employee.department_id = :departmentId', {
+        departmentId,
+      });
     }
 
-    const attendances = await this.attendanceRepository.find({
-      where: whereCondition,
-      relations: ['employee', 'employee.department'],
-    });
+    if (branchId) {
+      query.andWhere('employee.branch_id = :branchId', {
+        branchId,
+      });
+    }
+
+    const attendances = await query.getMany();
 
     // Calculate stats
     const totalAttendances = attendances.length;
@@ -321,6 +349,21 @@ export class AttendancesService {
       {} as Record<string, { count: number; hours: number }>,
     );
 
+    // Group by branch
+    const byBranch = attendances.reduce(
+      (acc, a) => {
+        const branchName =
+          a.employee && a.employee.branch ? a.employee.branch.name : 'Unknown';
+        if (!acc[branchName]) {
+          acc[branchName] = { count: 0, hours: 0 };
+        }
+        acc[branchName].count += 1;
+        acc[branchName].hours += a.working_hours;
+        return acc;
+      },
+      {} as Record<string, { count: number; hours: number }>,
+    );
+
     return {
       totalAttendances,
       totalEmployees,
@@ -329,6 +372,7 @@ export class AttendancesService {
       byType,
       byStatus,
       byDepartment,
+      byBranch,
     };
   }
 

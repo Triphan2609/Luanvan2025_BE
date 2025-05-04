@@ -14,6 +14,11 @@ export class QueryPayrollDto {
   department_id?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
+  branch_id?: number;
+
+  @IsOptional()
   @IsEnum(PayrollStatus)
   status?: PayrollStatus;
 

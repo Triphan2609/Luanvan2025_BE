@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, In } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import {
   EmployeeShift,
   ScheduleStatus,
@@ -65,13 +65,16 @@ export class EmployeeShiftsService {
     endDate?: string;
     status?: ScheduleStatus;
     department_id?: number;
+    branch_id?: number;
   }): Promise<EmployeeShift[]> {
     const query = this.employeeShiftRepository
       .createQueryBuilder('employeeShift')
       .leftJoinAndSelect('employeeShift.employee', 'employee')
       .leftJoinAndSelect('employeeShift.shift', 'shift')
       .leftJoinAndSelect('employee.department', 'department')
-      .leftJoinAndSelect('employee.role', 'role');
+      .leftJoinAndSelect('employee.role', 'role')
+      .leftJoinAndSelect('employee.branch', 'employee_branch')
+      .leftJoinAndSelect('shift.branch', 'shift_branch');
 
     if (filter?.employeeId) {
       query.andWhere('employeeShift.employee_id = :employeeId', {
@@ -116,6 +119,15 @@ export class EmployeeShiftsService {
       });
     }
 
+    if (filter?.branch_id) {
+      query.andWhere(
+        '(employee.branch_id = :branchId OR shift.branch_id = :branchId)',
+        {
+          branchId: filter.branch_id,
+        },
+      );
+    }
+
     // Sắp xếp theo ngày và ID ca
     query
       .orderBy('employeeShift.date', 'DESC')
@@ -128,22 +140,45 @@ export class EmployeeShiftsService {
   async findByDateRange(
     startDate: Date,
     endDate: Date,
+    branch_id?: number,
   ): Promise<EmployeeShift[]> {
-    return this.employeeShiftRepository.find({
-      where: {
-        date: Between(startDate, endDate),
-      },
-      relations: ['employee', 'employee.department', 'employee.role', 'shift'],
-      order: {
-        date: 'ASC',
-      },
-    });
+    const query = this.employeeShiftRepository
+      .createQueryBuilder('employeeShift')
+      .where('employeeShift.date BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
+      .leftJoinAndSelect('employeeShift.employee', 'employee')
+      .leftJoinAndSelect('employee.department', 'department')
+      .leftJoinAndSelect('employee.role', 'role')
+      .leftJoinAndSelect('employee.branch', 'employee_branch')
+      .leftJoinAndSelect('employeeShift.shift', 'shift')
+      .leftJoinAndSelect('shift.branch', 'shift_branch')
+      .orderBy('employeeShift.date', 'ASC');
+
+    if (branch_id) {
+      query.andWhere(
+        '(employee.branch_id = :branchId OR shift.branch_id = :branchId)',
+        {
+          branchId: branch_id,
+        },
+      );
+    }
+
+    return query.getMany();
   }
 
   async findOne(id: number): Promise<EmployeeShift> {
     const employeeShift = await this.employeeShiftRepository.findOne({
       where: { id },
-      relations: ['employee', 'employee.department', 'employee.role', 'shift'],
+      relations: [
+        'employee',
+        'employee.department',
+        'employee.role',
+        'employee.branch',
+        'shift',
+        'shift.branch',
+      ],
     });
     if (!employeeShift) {
       throw new NotFoundException('Lịch làm việc không tồn tại');
@@ -154,7 +189,14 @@ export class EmployeeShiftsService {
   async findByCode(code: string): Promise<EmployeeShift> {
     const employeeShift = await this.employeeShiftRepository.findOne({
       where: { schedule_code: code },
-      relations: ['employee', 'employee.department', 'employee.role', 'shift'],
+      relations: [
+        'employee',
+        'employee.department',
+        'employee.role',
+        'employee.branch',
+        'shift',
+        'shift.branch',
+      ],
     });
     if (!employeeShift) {
       throw new NotFoundException('Lịch làm việc không tồn tại');

@@ -53,16 +53,18 @@ export class EmployeesController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
-    @Query('department_id') departmentId?: number,
-    @Query('role_id') roleId?: number,
+    @Query('department_id') department_id?: number,
+    @Query('role_id') role_id?: number,
+    @Query('branch_id') branch_id?: number,
     @Query('status') status?: string,
   ) {
     return this.employeesService.findAll({
       page,
       limit,
       search,
-      departmentId,
-      roleId,
+      department_id,
+      role_id,
+      branch_id,
       status,
     });
   }

@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Employee } from './employee.entity';
 import { SalaryConfig, SalaryType } from './salary-config.entity';
+import { Branch } from '../../branches/entities/branch.entity';
 
 export enum PayrollStatus {
   DRAFT = 'draft', // Nháp, đang tính toán
@@ -41,6 +42,13 @@ export class Payroll {
 
   @Column({ name: 'employee_id' })
   employee_id: number;
+
+  @ManyToOne(() => Branch, { eager: true })
+  @JoinColumn({ name: 'branch_id' })
+  branch: Branch;
+
+  @Column({ name: 'branch_id', nullable: true })
+  branch_id: number;
 
   @ManyToOne(() => SalaryConfig, { eager: true })
   @JoinColumn({ name: 'salary_config_id' })

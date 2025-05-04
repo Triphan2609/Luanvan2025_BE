@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { DepartmentsService } from './departments.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
@@ -25,6 +26,11 @@ export class DepartmentsController {
   @Get()
   findAll() {
     return this.departmentsService.findAll();
+  }
+
+  @Get('by-branch/:id')
+  findByBranch(@Param('id', ParseIntPipe) id: number) {
+    return this.departmentsService.findByBranch(id);
   }
 
   @Get(':id')

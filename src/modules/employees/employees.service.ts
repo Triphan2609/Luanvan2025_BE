@@ -8,6 +8,17 @@ import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
+// Define a query params interface
+interface EmployeeQueryParams {
+  search?: string;
+  department_id?: number;
+  role_id?: number;
+  branch_id?: number;
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
 @Injectable()
 export class EmployeesService {
   private readonly logger = new Logger(EmployeesService.name);
@@ -19,8 +30,9 @@ export class EmployeesService {
   ) {}
 
   create(createEmployeeDto: CreateEmployeeDto) {
-    // Extract the department_id and role_id
-    const { department_id, role_id, ...otherData } = createEmployeeDto;
+    // Extract the department_id, role_id, and branch_id
+    const { department_id, role_id, branch_id, ...otherData } =
+      createEmployeeDto;
 
     // Create the base employee object
     const employeeData = { ...otherData };
@@ -34,89 +46,101 @@ export class EmployeesService {
       employeeData['role'] = { id: role_id };
     }
 
+    if (branch_id !== undefined) {
+      employeeData['branch'] = { id: branch_id };
+    }
+
     const employee = this.employeesRepository.create(employeeData);
     return this.employeesRepository.save(employee);
   }
 
-  async findAll(filters?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    departmentId?: number;
-    roleId?: number;
-    status?: string;
-  }) {
+  async findAll(
+    queryParams: EmployeeQueryParams,
+  ): Promise<{ data: Employee[]; total: number }> {
     try {
-      const query = this.employeesRepository
+      // Create a base query builder
+      const queryBuilder = this.employeesRepository
         .createQueryBuilder('employee')
         .leftJoinAndSelect('employee.department', 'department')
-        .leftJoinAndSelect('employee.role', 'role');
+        .leftJoinAndSelect('employee.role', 'role')
+        .leftJoinAndSelect('employee.branch', 'branch');
 
-      // Apply filters
-      if (filters?.search) {
-        query.andWhere(
+      // Apply search filter
+      if (queryParams.search) {
+        queryBuilder.andWhere(
           '(employee.name LIKE :search OR employee.email LIKE :search OR employee.phone LIKE :search OR employee.employee_code LIKE :search)',
-          { search: `%${filters.search}%` },
+          { search: `%${queryParams.search}%` },
         );
       }
 
-      if (filters?.departmentId) {
-        query.andWhere('employee.department_id = :departmentId', {
-          departmentId: filters.departmentId,
+      // Apply department filter
+      if (queryParams.department_id) {
+        queryBuilder.andWhere('employee.department_id = :departmentId', {
+          departmentId: queryParams.department_id,
         });
       }
 
-      if (filters?.roleId) {
-        query.andWhere('employee.role_id = :roleId', {
-          roleId: filters.roleId,
+      // Apply role filter
+      if (queryParams.role_id) {
+        queryBuilder.andWhere('employee.role_id = :roleId', {
+          roleId: queryParams.role_id,
         });
       }
 
-      if (filters?.status) {
-        query.andWhere('employee.status = :status', { status: filters.status });
+      // Apply branch filter
+      if (queryParams.branch_id) {
+        queryBuilder.andWhere('employee.branch_id = :branchId', {
+          branchId: queryParams.branch_id,
+        });
       }
 
-      // Add pagination if specified
-      const page = filters?.page || 1;
-      const limit = filters?.limit || 10;
+      // Apply status filter
+      if (queryParams.status) {
+        queryBuilder.andWhere('employee.status = :status', {
+          status: queryParams.status,
+        });
+      }
 
-      // Get total count before applying pagination
-      const total = await query.getCount();
+      // Parse pagination parameters
+      const page = queryParams.page || 1;
+      const limit = queryParams.limit || 10;
+      const skip = (page - 1) * limit;
+
+      // Get total count
+      const total = await queryBuilder.getCount();
 
       // Apply pagination
-      if (page && limit) {
-        query.skip((page - 1) * limit).take(limit);
-      }
+      queryBuilder.skip(skip).take(limit);
 
-      // Get results
-      const data = await query.getMany();
+      // Order by newest first
+      queryBuilder.orderBy('employee.id', 'DESC');
 
-      // Return with pagination metadata
+      // Execute query
+      const employees = await queryBuilder.getMany();
+
+      // Return data with pagination info
       return {
-        data,
+        data: employees,
         total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
       };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Error finding employees: ${errorMessage}`);
-      throw new BadRequestException('Failed to fetch employees');
+      throw new Error(`Failed to get employees: ${errorMessage}`);
     }
   }
 
   findOne(id: number) {
     return this.employeesRepository.findOne({
       where: { id },
-      relations: ['department', 'role'],
+      relations: ['department', 'role', 'branch'],
     });
   }
 
   async update(id: number, updateEmployeeDto: UpdateEmployeeDto) {
-    // Extract the department_id and role_id
-    const { department_id, role_id, ...otherData } = updateEmployeeDto;
+    // Extract the department_id, role_id, and branch_id
+    const { department_id, role_id, branch_id, ...otherData } =
+      updateEmployeeDto;
 
     // Create an object for direct database update
     const dataToUpdate = { ...otherData };
@@ -130,6 +154,11 @@ export class EmployeesService {
     if (role_id !== undefined) {
       // TypeORM expects relation objects for relationships
       dataToUpdate['role'] = { id: role_id };
+    }
+
+    if (branch_id !== undefined) {
+      // TypeORM expects relation objects for relationships
+      dataToUpdate['branch'] = { id: branch_id };
     }
 
     await this.employeesRepository.update(id, dataToUpdate);

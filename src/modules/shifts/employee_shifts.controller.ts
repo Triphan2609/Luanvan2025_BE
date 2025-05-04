@@ -40,6 +40,7 @@ export class EmployeeShiftsController {
     @Query('endDate') endDate?: string,
     @Query('status') status?: ScheduleStatus,
     @Query('department_id') department_id?: number,
+    @Query('branch_id') branch_id?: number,
   ) {
     return this.employeeShiftsService.findAll({
       employeeId,
@@ -49,6 +50,7 @@ export class EmployeeShiftsController {
       endDate,
       status,
       department_id,
+      branch_id,
     });
   }
 

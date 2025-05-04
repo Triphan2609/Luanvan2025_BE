@@ -9,6 +9,7 @@ import {
   Query,
   HttpStatus,
   HttpCode,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ShiftsService } from './shifts.service';
 import { CreateShiftDto } from './dto/create-shift.dto';
@@ -30,6 +31,7 @@ export class ShiftsController {
   findAll(
     @Query('type') type?: ShiftType,
     @Query('isActive') isActive?: string | boolean,
+    @Query('branch_id') branch_id?: string,
   ) {
     return this.shiftsService.findAll({
       type,
@@ -37,7 +39,13 @@ export class ShiftsController {
         isActive === undefined
           ? undefined
           : isActive === true || isActive === 'true',
+      branch_id: branch_id ? +branch_id : undefined,
     });
+  }
+
+  @Get('by-branch/:id')
+  findByBranch(@Param('id', ParseIntPipe) id: number) {
+    return this.shiftsService.findByBranch(id);
   }
 
   @Get('active')

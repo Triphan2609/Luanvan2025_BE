@@ -60,12 +60,20 @@ export class AttendancesController {
   getAttendanceStats(
     @Query('start_date') startDate: string,
     @Query('end_date') endDate: string,
-    @Query('department_id', ParseIntPipe) departmentId?: number,
+    @Query('department_id') departmentId?: number,
+    @Query('branch_id') branchId?: number,
   ) {
+    // Convert strings to numbers if provided
+    const deptId = departmentId
+      ? parseInt(departmentId.toString(), 10)
+      : undefined;
+    const brId = branchId ? parseInt(branchId.toString(), 10) : undefined;
+
     return this.attendancesService.getAttendanceStats(
       startDate,
       endDate,
-      departmentId,
+      deptId,
+      brId,
     );
   }
 }

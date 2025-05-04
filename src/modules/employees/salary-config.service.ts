@@ -103,57 +103,61 @@ export class SalaryConfigService {
   }
 
   async findAll(queryDto: QuerySalaryConfigDto): Promise<SalaryConfig[]> {
-    const where: {
-      department_id?: number;
-      role_id?: number;
-      is_active?: boolean;
-      salary_type?: SalaryType;
-    } = {};
+    // Create query builder for more complex filtering
+    const queryBuilder = this.salaryConfigRepository
+      .createQueryBuilder('config')
+      .leftJoinAndSelect('config.department', 'department')
+      .leftJoinAndSelect('config.role', 'role')
+      .leftJoinAndSelect('department.branch', 'branch')
+      .orderBy('config.department_id', 'ASC')
+      .addOrderBy('config.role_id', 'ASC');
 
+    // Apply filters
     if (queryDto.department_id) {
-      where.department_id = queryDto.department_id;
+      queryBuilder.andWhere('config.department_id = :departmentId', {
+        departmentId: queryDto.department_id,
+      });
     }
 
     if (queryDto.role_id) {
-      where.role_id = queryDto.role_id;
+      queryBuilder.andWhere('config.role_id = :roleId', {
+        roleId: queryDto.role_id,
+      });
     }
 
     if (queryDto.is_active !== undefined) {
-      where.is_active = queryDto.is_active;
+      queryBuilder.andWhere('config.is_active = :isActive', {
+        isActive: queryDto.is_active,
+      });
       this.logger.debug(
-        `Is active filter applied with value: ${where.is_active}, type: ${typeof where.is_active}`,
+        `Is active filter applied with value: ${queryDto.is_active}, type: ${typeof queryDto.is_active}`,
       );
     }
 
     if (queryDto.salary_type) {
-      where.salary_type = queryDto.salary_type;
+      queryBuilder.andWhere('config.salary_type = :salaryType', {
+        salaryType: queryDto.salary_type,
+      });
       this.logger.debug(
-        `Salary type filter applied with value: ${where.salary_type}`,
+        `Salary type filter applied with value: ${queryDto.salary_type}`,
       );
     }
 
-    this.logger.debug(
-      `Finding salary configs with where clause: ${JSON.stringify(where)}`,
-    );
+    // Add branch filtering
+    if (queryDto.branch_id) {
+      queryBuilder.andWhere('department.branch_id = :branchId', {
+        branchId: queryDto.branch_id,
+      });
+      this.logger.debug(
+        `Branch filter applied with value: ${queryDto.branch_id}`,
+      );
+    }
+
     this.logger.debug(`Query parameters: ${JSON.stringify(queryDto)}`);
 
-    const configs = await this.salaryConfigRepository.find({
-      where,
-      relations: ['department', 'role'],
-      order: { department_id: 'ASC', role_id: 'ASC' },
-    });
+    const configs = await queryBuilder.getMany();
 
     this.logger.debug(`Found ${configs.length} salary configs with filters`);
-
-    // Log salary types trong kết quả
-    if (configs.length > 0) {
-      this.logger.debug(`Sample salary_type values:`);
-      configs.slice(0, 3).forEach((config, index) => {
-        this.logger.debug(
-          `Config ${index + 1} salary_type: ${config.salary_type}, type: ${typeof config.salary_type}`,
-        );
-      });
-    }
 
     return configs;
   }

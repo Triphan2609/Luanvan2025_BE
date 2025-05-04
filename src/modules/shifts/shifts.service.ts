@@ -45,8 +45,11 @@ export class ShiftsService {
   async findAll(options?: {
     type?: ShiftType;
     isActive?: boolean;
+    branch_id?: number;
   }): Promise<Shift[]> {
-    const query = this.shiftRepository.createQueryBuilder('shift');
+    const query = this.shiftRepository
+      .createQueryBuilder('shift')
+      .leftJoinAndSelect('shift.branch', 'branch');
 
     if (options?.type) {
       query.andWhere('shift.type = :type', { type: options.type });
@@ -58,11 +61,28 @@ export class ShiftsService {
       });
     }
 
+    if (options?.branch_id) {
+      query.andWhere('shift.branch_id = :branchId', {
+        branchId: options.branch_id,
+      });
+    }
+
     return query.getMany();
   }
 
+  async findByBranch(branchId: number): Promise<Shift[]> {
+    return this.shiftRepository.find({
+      where: { branch_id: branchId },
+      relations: ['branch'],
+      order: { name: 'ASC' },
+    });
+  }
+
   async findOne(id: number): Promise<Shift> {
-    const shift = await this.shiftRepository.findOne({ where: { id } });
+    const shift = await this.shiftRepository.findOne({
+      where: { id },
+      relations: ['branch'],
+    });
     if (!shift) {
       throw new NotFoundException('Ca làm việc không tồn tại');
     }
@@ -72,6 +92,7 @@ export class ShiftsService {
   async findByCode(code: string): Promise<Shift> {
     const shift = await this.shiftRepository.findOne({
       where: { shift_code: code },
+      relations: ['branch'],
     });
     if (!shift) {
       throw new NotFoundException('Ca làm việc không tồn tại');

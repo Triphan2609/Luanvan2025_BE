@@ -49,6 +49,9 @@ export class CreateEmployeeDto {
   @IsInt()
   role_id: number;
 
+  @IsInt()
+  branch_id: number;
+
   @IsOptional()
   @IsEnum(['active', 'on_leave', 'inactive'])
   status?: 'active' | 'on_leave' | 'inactive';

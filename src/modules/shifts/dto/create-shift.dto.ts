@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsBoolean,
+  IsInt,
 } from 'class-validator';
 import { ShiftType } from '../entities/shift.entity';
 
@@ -42,4 +43,8 @@ export class CreateShiftDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  branch_id?: number;
 }

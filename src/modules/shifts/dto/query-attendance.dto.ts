@@ -25,6 +25,11 @@ export class QueryAttendanceDto {
   @IsOptional()
   @IsNumber()
   @Transform(({ value }) => parseInt(value, 10))
+  branch_id?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
   employee_shift_id?: number;
 
   @IsOptional()

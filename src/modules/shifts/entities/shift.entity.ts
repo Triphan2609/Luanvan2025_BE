@@ -1,5 +1,13 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { EmployeeShift } from './employee-shift.entity';
+import { Branch } from '../../branches/entities/branch.entity';
 
 export enum ShiftType {
   MORNING = 'morning',
@@ -43,6 +51,13 @@ export class Shift {
 
   @Column({ default: true })
   is_active: boolean; // Trạng thái hoạt động
+
+  @ManyToOne(() => Branch, { nullable: true })
+  @JoinColumn({ name: 'branch_id' })
+  branch: Branch;
+
+  @Column({ nullable: true })
+  branch_id: number;
 
   @OneToMany(() => EmployeeShift, (employeeShift) => employeeShift.shift)
   employeeShifts: EmployeeShift[];

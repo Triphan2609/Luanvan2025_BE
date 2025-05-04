@@ -7,7 +7,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, Like, FindOptionsWhere, In } from 'typeorm';
+import { Repository, Between, FindOptionsWhere, In } from 'typeorm';
 import {
   Payroll,
   PayrollStatus,
@@ -496,12 +496,21 @@ export class PayrollService {
       // Kiểm tra nhân viên
       const employee = await this.employeeRepository.findOne({
         where: { id: employee_id },
-        relations: ['department', 'role'],
+        relations: ['department', 'role', 'branch'],
       });
 
       if (!employee) {
         throw new NotFoundException(
           `Không tìm thấy nhân viên với ID ${employee_id}`,
+        );
+      }
+
+      // Lấy branch_id từ nhân viên nếu không được chỉ định trong DTO
+      const branch_id = createPayrollDto.branch_id || employee.branch?.id;
+
+      if (!branch_id) {
+        this.logger.warn(
+          `Employee ${employee_id} does not have a branch assigned. Payroll will be created without branch information.`,
         );
       }
 
@@ -812,6 +821,7 @@ export class PayrollService {
       const payrollEntity = this.payrollRepository.create({
         payroll_code: payrollCode,
         employee_id,
+        branch_id, // Thêm branch_id vào bảng lương
         salary_config_id: salaryConfig.id,
         salary_type: salaryConfig.salary_type,
         period_start: new Date(period_start),
@@ -968,9 +978,8 @@ export class PayrollService {
         where.employee_id = queryDto.employee_id;
       }
 
-      if (queryDto.department_id) {
-        where.employee = { department: { id: queryDto.department_id } };
-      }
+      // Avoid using spread operators directly in the query to prevent type errors
+      // Instead, use the query builder approach for complex conditions
 
       // Fix date filtering to properly include payrolls in the date range
       if (queryDto.start_date && queryDto.end_date) {
@@ -1002,10 +1011,6 @@ export class PayrollService {
         where.status = queryDto.status;
       }
 
-      if (queryDto.search) {
-        where.employee = { name: Like(`%${queryDto.search}%`) };
-      }
-
       this.logger.debug(`Final query conditions: ${JSON.stringify(where)}`);
 
       // Sử dụng query Builder để có nhiều kiểm soát hơn
@@ -1013,6 +1018,7 @@ export class PayrollService {
         .createQueryBuilder('payroll')
         .leftJoinAndSelect('payroll.employee', 'employee')
         .leftJoinAndSelect('employee.department', 'department')
+        .leftJoinAndSelect('employee.branch', 'branch')
         .leftJoinAndSelect('employee.role', 'role');
 
       // Áp dụng các điều kiện
@@ -1025,6 +1031,12 @@ export class PayrollService {
       if (queryDto.department_id) {
         query = query.andWhere('employee.department_id = :departmentId', {
           departmentId: queryDto.department_id,
+        });
+      }
+
+      if (queryDto.branch_id) {
+        query = query.andWhere('employee.branch_id = :branchId', {
+          branchId: queryDto.branch_id,
         });
       }
 
@@ -1123,11 +1135,7 @@ export class PayrollService {
   async remove(id: number): Promise<void> {
     const payroll = await this.findOne(id);
 
-    // Only allow deletion of draft payrolls
-    if (payroll.status !== PayrollStatus.DRAFT) {
-      throw new BadRequestException('Only draft payrolls can be deleted');
-    }
-
+    // Remove the status check to allow deletion of any payroll
     await this.payrollRepository.remove(payroll);
   }
 
@@ -1235,107 +1243,133 @@ export class PayrollService {
     startDate: string,
     endDate: string,
     departmentId?: number,
+    branchId?: number,
   ) {
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+
     try {
-      this.logger.debug(
-        `Getting payroll stats for period ${startDate} to ${endDate}`,
-      );
+      // Verify we have valid dates
+      if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+        throw new BadRequestException('Invalid date range');
+      }
 
-      // Create base query for payrolls within date range - sử dụng logic tương tự như findAll
-      const query = this.payrollRepository
-        .createQueryBuilder('payroll')
-        .leftJoinAndSelect('payroll.employee', 'employee')
-        .leftJoinAndSelect('employee.department', 'department');
-
-      // Parse dates
-      const startDateObj = new Date(startDate);
-      const endDateObj = new Date(endDate);
-
-      // Make sure endDate is set to the end of the day
+      // Ensure endDate is set to the end of the day
       endDateObj.setHours(23, 59, 59, 999);
 
-      this.logger.debug(
-        `Using date range: ${startDateObj.toISOString()} to ${endDateObj.toISOString()}`,
-      );
+      // Find payrolls in the date range
+      let query = this.payrollRepository
+        .createQueryBuilder('payroll')
+        .leftJoinAndSelect('payroll.employee', 'employee')
+        .leftJoinAndSelect('employee.department', 'department')
+        .leftJoinAndSelect('employee.branch', 'branch')
+        .where(
+          '(payroll.period_start BETWEEN :startDate AND :endDate OR payroll.period_end BETWEEN :startDate AND :endDate)',
+          { startDate: startDateObj, endDate: endDateObj },
+        );
 
-      // Sửa điều kiện truy vấn để khớp với findAll
-      query.where(
-        '(payroll.period_start BETWEEN :startDate AND :endDate OR payroll.period_end BETWEEN :startDate AND :endDate)',
-        { startDate: startDateObj, endDate: endDateObj },
-      );
-
-      // Add department filter if specified
       if (departmentId) {
-        query.andWhere('employee.department_id = :departmentId', {
+        query = query.andWhere('employee.department_id = :departmentId', {
           departmentId,
         });
       }
 
-      // Log the generated SQL để debug
-      const sqlString = query.getQueryAndParameters();
-      this.logger.debug(`Generated stats query: ${JSON.stringify(sqlString)}`);
+      if (branchId) {
+        query = query.andWhere('employee.branch_id = :branchId', {
+          branchId,
+        });
+      }
 
-      // Get all payrolls matching criteria
       const payrolls = await query.getMany();
-      this.logger.debug(
-        `Found ${payrolls.length} payrolls for stats calculation`,
-      );
 
-      // Count unique employees
-      const uniqueEmployeeIds = new Set<number>();
-      payrolls.forEach((payroll) => {
-        if (payroll.employee?.id) {
-          uniqueEmployeeIds.add(payroll.employee.id);
-        }
-      });
+      this.logger.debug(`Found ${payrolls.length} payrolls for stats`);
 
-      // Calculate aggregate stats
+      if (payrolls.length === 0) {
+        return {
+          totalPayrolls: 0,
+          totalEmployees: 0,
+          totalGrossPay: 0,
+          totalNetPay: 0,
+          byStatus: {},
+          byDepartment: {},
+          byBranch: {},
+        };
+      }
+
+      const uniqueEmployees = new Set<number>();
+      payrolls.forEach((payroll) => uniqueEmployees.add(payroll.employee_id));
+
+      // Calculate total values
       const totalGrossPay = payrolls.reduce(
-        (sum, p) => sum + (p.gross_pay || 0),
+        (sum, payroll) => sum + (payroll.gross_pay || 0),
         0,
       );
       const totalNetPay = payrolls.reduce(
-        (sum, p) => sum + (p.net_pay || 0),
+        (sum, payroll) => sum + (payroll.net_pay || 0),
         0,
       );
 
-      // Count by status
-      // Define the enum values as a const to use for type checking
-      type PayrollStatus = 'draft' | 'finalized' | 'paid';
-
-      const byStatus = {
-        draft: payrolls.filter((p) => p.status === ('draft' as PayrollStatus))
-          .length,
-        finalized: payrolls.filter(
-          (p) => p.status === ('finalized' as PayrollStatus),
-        ).length,
-        paid: payrolls.filter((p) => p.status === ('paid' as PayrollStatus))
-          .length,
+      // Group by status
+      const byStatus: Record<PayrollStatus, number> = {
+        draft: 0,
+        finalized: 0,
+        paid: 0,
+        pending: 0,
+        cancelled: 0,
       };
 
-      // Count by department
-      const byDepartment: Record<string, number> = {};
       payrolls.forEach((payroll) => {
-        const deptName = payroll.employee?.department?.name || 'Undefined';
-        byDepartment[deptName] = (byDepartment[deptName] || 0) + 1;
+        byStatus[payroll.status] = (byStatus[payroll.status] || 0) + 1;
       });
 
-      const result = {
+      // Group by department
+      const byDepartment: Record<string, { count: number; amount: number }> =
+        {};
+      const byBranch: Record<string, { count: number; amount: number }> = {};
+
+      payrolls.forEach((payroll) => {
+        const deptName =
+          payroll.employee?.department?.name || 'Unknown Department';
+        if (!byDepartment[deptName]) {
+          byDepartment[deptName] = { count: 0, amount: 0 };
+        }
+        byDepartment[deptName].count += 1;
+        byDepartment[deptName].amount += payroll.net_pay || 0;
+
+        // Group by branch
+        const branchName = payroll.employee?.branch?.name || 'Unknown Branch';
+        if (!byBranch[branchName]) {
+          byBranch[branchName] = { count: 0, amount: 0 };
+        }
+        byBranch[branchName].count += 1;
+        byBranch[branchName].amount += payroll.net_pay || 0;
+      });
+
+      // Get monthly trend data
+      const monthlyTrend = await this.getMonthlyTrend(
+        startDate,
+        endDate,
+        departmentId,
+        branchId,
+      );
+
+      return {
         totalPayrolls: payrolls.length,
-        totalEmployees: uniqueEmployeeIds.size,
+        totalEmployees: uniqueEmployees.size,
         totalGrossPay,
         totalNetPay,
         byStatus,
         byDepartment,
+        byBranch,
+        monthlyTrend,
       };
-
-      this.logger.debug(`Stats result: ${JSON.stringify(result)}`);
-      return result;
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      this.logger.error(`Error getting payroll stats: ${errorMessage}`);
-      throw new Error(`Failed to get payroll statistics: ${errorMessage}`);
+    } catch (error) {
+      this.logger.error(
+        `Error in getPayrollStats: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      throw error;
     }
   }
 
@@ -1343,6 +1377,7 @@ export class PayrollService {
     startDate: string,
     endDate: string,
     departmentId?: number,
+    branchId?: number,
   ) {
     try {
       const query = this.payrollRepository
@@ -1354,6 +1389,12 @@ export class PayrollService {
       if (departmentId) {
         query.andWhere('employee.department_id = :departmentId', {
           departmentId,
+        });
+      }
+
+      if (branchId) {
+        query.andWhere('employee.branch_id = :branchId', {
+          branchId,
         });
       }
 
@@ -1497,6 +1538,7 @@ export class PayrollService {
     periodStart2: string,
     periodEnd2: string,
     departmentId?: number,
+    branchId?: number,
   ) {
     try {
       // Get data for first period
@@ -1523,6 +1565,15 @@ export class PayrollService {
         });
         period2Query.andWhere('employee.department_id = :departmentId', {
           departmentId,
+        });
+      }
+
+      if (branchId) {
+        period1Query.andWhere('employee.branch_id = :branchId', {
+          branchId,
+        });
+        period2Query.andWhere('employee.branch_id = :branchId', {
+          branchId,
         });
       }
 
@@ -1596,6 +1647,7 @@ export class PayrollService {
     endDate: string,
     groupBy: 'month' | 'week' | 'day',
     departmentId?: number,
+    branchId?: number,
   ) {
     try {
       const query = this.payrollRepository
@@ -1607,6 +1659,12 @@ export class PayrollService {
       if (departmentId) {
         query.andWhere('employee.department_id = :departmentId', {
           departmentId,
+        });
+      }
+
+      if (branchId) {
+        query.andWhere('employee.branch_id = :branchId', {
+          branchId,
         });
       }
 
@@ -2153,6 +2211,7 @@ export class PayrollService {
     periodType: PayrollPeriodType,
     employeeIds?: number[],
     departmentId?: number,
+    branchId?: number,
     createdBy?: number,
   ): Promise<{
     total: number;
@@ -2170,101 +2229,64 @@ export class PayrollService {
     };
 
     try {
-      // 1. Xác định danh sách nhân viên cần tạo bảng lương
-      let employees: Employee[] = [];
+      // Build query to find employees
+      const query = this.employeeRepository
+        .createQueryBuilder('employee')
+        .where('employee.status = :status', { status: 'active' });
 
-      // Nếu chỉ định danh sách employeeIds
+      // Filter by department if provided
+      if (departmentId) {
+        query.andWhere('employee.department_id = :departmentId', {
+          departmentId,
+        });
+      }
+
+      // Filter by branch if provided
+      if (branchId) {
+        query.andWhere('employee.branch_id = :branchId', { branchId });
+      }
+
+      // Filter by specific employees if provided
       if (employeeIds && employeeIds.length > 0) {
-        employees = await this.employeeRepository.find({
-          where: { id: In(employeeIds) },
-          relations: ['department', 'role'],
-        });
-      }
-      // Nếu chỉ định departmentId
-      else if (departmentId) {
-        employees = await this.employeeRepository.find({
-          where: { department: { id: departmentId } },
-          relations: ['department', 'role'],
-        });
-      }
-      // Nếu không chỉ định, lấy tất cả nhân viên có dữ liệu chấm công trong kỳ
-      else {
-        // Lấy danh sách nhân viên có dữ liệu chấm công trong kỳ
-        const attendances = await this.attendanceRepository.find({
-          where: {
-            date: Between(new Date(periodStartDate), new Date(periodEndDate)),
-            status: AttendanceStatus.APPROVED,
-            is_processed: false, // Chỉ lấy các chấm công chưa được xử lý
-          },
-          select: ['employee_id'],
-        });
-
-        // Danh sách ID nhân viên không trùng lặp
-        const uniqueEmployeeIds = [
-          ...new Set(attendances.map((a) => a.employee_id)),
-        ];
-
-        if (uniqueEmployeeIds.length > 0) {
-          employees = await this.employeeRepository.find({
-            where: { id: In(uniqueEmployeeIds) },
-            relations: ['department', 'role'],
-          });
-        }
+        query.andWhere('employee.id IN (:...employeeIds)', { employeeIds });
       }
 
+      // Get employees
+      const employees = await query.getMany();
       result.total = employees.length;
 
-      // 2. Tạo bảng lương cho từng nhân viên
+      if (employees.length === 0) {
+        return result;
+      }
+
+      // Create payrolls for each employee
       for (const employee of employees) {
         try {
-          // Kiểm tra xem đã có bảng lương cho nhân viên này trong kỳ chưa
-          const existingPayroll = await this.payrollRepository.findOne({
-            where: {
-              employee_id: employee.id,
-              period_start: Between(
-                new Date(periodStartDate),
-                new Date(periodEndDate),
-              ),
-              period_end: Between(
-                new Date(periodStartDate),
-                new Date(periodEndDate),
-              ),
-            },
-          });
-
-          if (existingPayroll) {
-            throw new Error(
-              `Đã tồn tại bảng lương cho nhân viên ${employee.name} trong kỳ này`,
-            );
-          }
-
-          // Tạo dữ liệu cho bảng lương
-          const payrollDto: CreatePayrollDto = {
+          const payroll = await this.create({
             employee_id: employee.id,
+            branch_id: employee.branch?.id, // Add branch_id from employee
             period_start: periodStartDate,
             period_end: periodEndDate,
             period_type: periodType,
-            status: PayrollStatus.DRAFT,
             created_by: createdBy,
-          };
+          });
 
-          // Gọi hàm tạo bảng lương
-          const payroll = await this.create(payrollDto);
           result.success++;
           result.payrolls.push(payroll);
         } catch (error) {
           result.failed++;
-          result.errors.push({
-            employeeId: employee.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error';
+          result.errors.push({ employeeId: employee.id, error: errorMessage });
         }
       }
 
       return result;
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       throw new InternalServerErrorException(
-        `Không thể tạo bảng lương tự động: ${error instanceof Error ? error.message : String(error)}`,
+        `Error generating payrolls: ${errorMessage}`,
       );
     }
   }

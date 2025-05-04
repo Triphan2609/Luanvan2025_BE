@@ -14,6 +14,11 @@ export class QuerySalaryConfigDto {
   role_id?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
+  branch_id?: number;
+
+  @IsOptional()
   @IsBoolean()
   @Transform(({ value }): boolean => {
     if (value === 'true' || value === true || value === '1' || value === 1) {

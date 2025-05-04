@@ -69,6 +69,10 @@ class GeneratePayrollsDto {
 
   @IsOptional()
   @IsNumber()
+  branch_id?: number;
+
+  @IsOptional()
+  @IsNumber()
   created_by?: number;
 }
 
@@ -171,11 +175,19 @@ export class PayrollController {
     @Query('start_date') startDate: string,
     @Query('end_date') endDate: string,
     @Query('department_id') departmentId?: number,
+    @Query('branch_id') branchId?: number,
   ) {
+    // Convert strings to numbers if provided
+    const deptId = departmentId
+      ? parseInt(departmentId.toString(), 10)
+      : undefined;
+    const brId = branchId ? parseInt(branchId.toString(), 10) : undefined;
+
     return this.payrollService.getPayrollStats(
       startDate,
       endDate,
-      departmentId,
+      deptId,
+      brId,
     );
   }
 
@@ -229,14 +241,22 @@ export class PayrollController {
     @Query('period_end_1') periodEnd1: string,
     @Query('period_start_2') periodStart2: string,
     @Query('period_end_2') periodEnd2: string,
-    @Query('department_id', ParseIntPipe) departmentId?: number,
+    @Query('department_id') departmentId?: number,
+    @Query('branch_id') branchId?: number,
   ) {
+    // Convert strings to numbers if provided
+    const deptId = departmentId
+      ? parseInt(departmentId.toString(), 10)
+      : undefined;
+    const brId = branchId ? parseInt(branchId.toString(), 10) : undefined;
+
     return this.payrollService.getPayrollComparison(
       periodStart1,
       periodEnd1,
       periodStart2,
       periodEnd2,
-      departmentId,
+      deptId,
+      brId,
     );
   }
 
@@ -245,13 +265,21 @@ export class PayrollController {
     @Query('start_date') startDate: string,
     @Query('end_date') endDate: string,
     @Query('group_by') groupBy: 'month' | 'week' | 'day',
-    @Query('department_id', ParseIntPipe) departmentId?: number,
+    @Query('department_id') departmentId?: number,
+    @Query('branch_id') branchId?: number,
   ) {
+    // Convert strings to numbers if provided
+    const deptId = departmentId
+      ? parseInt(departmentId.toString(), 10)
+      : undefined;
+    const brId = branchId ? parseInt(branchId.toString(), 10) : undefined;
+
     return this.payrollService.getPayrollTrends(
       startDate,
       endDate,
-      groupBy,
-      departmentId,
+      groupBy || 'month',
+      deptId,
+      brId,
     );
   }
 
@@ -314,12 +342,37 @@ export class PayrollController {
 
   @Post('generate-batch')
   async generatePayrolls(@Body() generateDto: GeneratePayrollsDto) {
+    this.logger.debug(
+      `Received generate payrolls request: ${JSON.stringify(generateDto)}`,
+    );
+
+    // Convert number strings to actual numbers
+    if (generateDto.department_id) {
+      generateDto.department_id = Number(generateDto.department_id);
+    }
+
+    if (generateDto.branch_id) {
+      generateDto.branch_id = Number(generateDto.branch_id);
+    }
+
+    if (generateDto.created_by) {
+      generateDto.created_by = Number(generateDto.created_by);
+    }
+
+    // Ensure employee_ids are converted to numbers
+    if (generateDto.employee_ids && Array.isArray(generateDto.employee_ids)) {
+      generateDto.employee_ids = generateDto.employee_ids.map((id) =>
+        Number(id),
+      );
+    }
+
     return this.payrollService.generatePayrolls(
       generateDto.period_start,
       generateDto.period_end,
       generateDto.period_type,
       generateDto.employee_ids,
       generateDto.department_id,
+      generateDto.branch_id,
       generateDto.created_by,
     );
   }

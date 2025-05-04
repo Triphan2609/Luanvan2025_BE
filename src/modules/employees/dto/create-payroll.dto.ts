@@ -78,6 +78,10 @@ export class CreatePayrollDto {
 
   @IsOptional()
   @IsNumber()
+  branch_id?: number;
+
+  @IsOptional()
+  @IsNumber()
   salary_config_id?: number;
 
   @IsNotEmpty()
