@@ -16,6 +16,7 @@ import { UpdateAttendanceStatusDto } from './dto/update-attendance-status.dto';
 import { QueryAttendanceDto } from './dto/query-attendance.dto';
 import { EmployeeShift } from './entities/employee-shift.entity';
 import { Employee } from '../employees/entities/employee.entity';
+import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 
 @Injectable()
 export class AttendancesService {
@@ -227,8 +228,110 @@ export class AttendancesService {
     updateStatusDto: UpdateAttendanceStatusDto,
   ): Promise<Attendance> {
     const attendance = await this.findOne(id);
+    Object.assign(attendance, updateStatusDto);
+    return this.attendanceRepository.save(attendance);
+  }
 
-    this.attendanceRepository.merge(attendance, updateStatusDto);
+  async update(
+    id: number,
+    updateAttendanceDto: UpdateAttendanceDto,
+  ): Promise<Attendance> {
+    const attendance = await this.findOne(id);
+
+    // Xử lý cập nhật thông tin chấm công
+    if (updateAttendanceDto.employee_shift_id) {
+      const employeeShift = await this.employeeShiftRepository.findOne({
+        where: { id: updateAttendanceDto.employee_shift_id },
+        relations: ['shift'],
+      });
+
+      if (!employeeShift) {
+        throw new NotFoundException(
+          `Không tìm thấy ca làm việc với ID ${updateAttendanceDto.employee_shift_id}`,
+        );
+      }
+
+      attendance.employeeShift = employeeShift;
+    }
+
+    // Cập nhật các trường thông tin
+    if (updateAttendanceDto.check_in) {
+      attendance.check_in = updateAttendanceDto.check_in;
+    }
+
+    if (updateAttendanceDto.check_out) {
+      attendance.check_out = updateAttendanceDto.check_out;
+    }
+
+    if (updateAttendanceDto.type) {
+      attendance.type = updateAttendanceDto.type;
+    }
+
+    if (updateAttendanceDto.notes !== undefined) {
+      attendance.notes = updateAttendanceDto.notes;
+    }
+
+    // Tính toán lại giờ làm việc nếu có cả check-in và check-out
+    if (attendance.check_in && attendance.check_out) {
+      if (attendance.employeeShift && attendance.employeeShift.shift) {
+        const isNightShift =
+          attendance.type === AttendanceType.NIGHT_SHIFT ||
+          attendance.employeeShift.shift.end_time === '00:00:00' ||
+          attendance.employeeShift.shift.start_time === '00:00:00' ||
+          attendance.employeeShift.shift.start_time >
+            attendance.employeeShift.shift.end_time;
+
+        attendance.working_hours = this.calculateWorkingHoursWithShift(
+          attendance.check_in,
+          attendance.check_out,
+          attendance.employeeShift.shift.start_time,
+          attendance.employeeShift.shift.end_time,
+          isNightShift,
+        );
+      } else {
+        attendance.working_hours = this.calculateWorkingHours(
+          attendance.check_in,
+          attendance.check_out,
+        );
+      }
+
+      // Cập nhật phân loại giờ theo loại chấm công
+      if (attendance.type === AttendanceType.OVERTIME) {
+        attendance.overtime_hours = attendance.working_hours;
+        attendance.night_shift_hours = 0;
+        attendance.holiday_hours = 0;
+      } else if (attendance.type === AttendanceType.NIGHT_SHIFT) {
+        attendance.night_shift_hours = attendance.working_hours;
+        attendance.overtime_hours = 0;
+        attendance.holiday_hours = 0;
+      } else if (attendance.type === AttendanceType.HOLIDAY) {
+        attendance.holiday_hours = attendance.working_hours;
+        attendance.overtime_hours = 0;
+        attendance.night_shift_hours = 0;
+      } else {
+        // AttendanceType.NORMAL
+        attendance.overtime_hours = 0;
+        attendance.night_shift_hours = 0;
+        attendance.holiday_hours = 0;
+      }
+    }
+
+    // Cho phép ghi đè các giá trị giờ làm việc nếu được chỉ định
+    if (updateAttendanceDto.working_hours !== undefined) {
+      attendance.working_hours = updateAttendanceDto.working_hours;
+    }
+
+    if (updateAttendanceDto.overtime_hours !== undefined) {
+      attendance.overtime_hours = updateAttendanceDto.overtime_hours;
+    }
+
+    if (updateAttendanceDto.night_shift_hours !== undefined) {
+      attendance.night_shift_hours = updateAttendanceDto.night_shift_hours;
+    }
+
+    if (updateAttendanceDto.holiday_hours !== undefined) {
+      attendance.holiday_hours = updateAttendanceDto.holiday_hours;
+    }
 
     return this.attendanceRepository.save(attendance);
   }

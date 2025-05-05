@@ -8,10 +8,12 @@ import {
   Query,
   Patch,
   ParseIntPipe,
+  Put,
 } from '@nestjs/common';
 import { AttendancesService } from './attendances.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceStatusDto } from './dto/update-attendance-status.dto';
+import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { QueryAttendanceDto } from './dto/query-attendance.dto';
 import { Public } from '../auth/guards/public.decorator';
 
@@ -33,6 +35,14 @@ export class AttendancesController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.attendancesService.findOne(id);
+  }
+
+  @Put(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateAttendanceDto: UpdateAttendanceDto,
+  ) {
+    return this.attendancesService.update(id, updateAttendanceDto);
   }
 
   @Patch(':id/status')

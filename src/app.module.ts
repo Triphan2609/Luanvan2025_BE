@@ -16,6 +16,8 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { RolesEmployeeModule } from './modules/roles_employee/roles-employee.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { CustomersModule } from './modules/customers/customers.module';
+import { MembershipCardsModule } from './modules/membership-cards/membership-cards.module';
 
 @Module({
   imports: [
@@ -39,6 +41,11 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         logging: configService.get<string>('NODE_ENV') !== 'production',
         autoLoadEntities: true,
+        dateStrings: true,
+        extra: {
+          connectionLimit: 10,
+          charset: 'utf8mb4_unicode_ci',
+        },
       }),
       inject: [ConfigService],
     }),
@@ -53,6 +60,8 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     DepartmentsModule,
     RolesEmployeeModule,
     ShiftsModule,
+    CustomersModule,
+    MembershipCardsModule,
   ],
   providers: [
     {
