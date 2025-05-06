@@ -18,6 +18,11 @@ import { ShiftsModule } from './modules/shifts/shifts.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { CustomersModule } from './modules/customers/customers.module';
 import { MembershipCardsModule } from './modules/membership-cards/membership-cards.module';
+import { RoomTypesModule } from './modules/room-types/room-types.module';
+import { RoomsModule } from './modules/rooms/rooms.module';
+import { StuffModule } from './modules/stuff/stuff.module';
+import { AmenitiesModule } from './modules/amenities/amenities.module';
+import { FloorsModule } from './modules/floors/floors.module';
 
 @Module({
   imports: [
@@ -62,6 +67,11 @@ import { MembershipCardsModule } from './modules/membership-cards/membership-car
     ShiftsModule,
     CustomersModule,
     MembershipCardsModule,
+    RoomTypesModule,
+    RoomsModule,
+    StuffModule,
+    AmenitiesModule,
+    FloorsModule,
   ],
   providers: [
     {

@@ -20,11 +20,16 @@ export class BranchesService {
   ) {}
 
   async findAll(): Promise<Branch[]> {
-    return this.branchRepository.find();
+    return this.branchRepository.find({
+      relations: ['branchType'],
+    });
   }
 
   async findOne(id: number): Promise<Branch> {
-    const branch = await this.branchRepository.findOne({ where: { id } });
+    const branch = await this.branchRepository.findOne({
+      where: { id },
+      relations: ['branchType'],
+    });
     if (!branch) {
       throw new NotFoundException('Chi nhánh không tồn tại');
     }
