@@ -25,6 +25,11 @@ import { FilterCustomerDto } from './dto/filter-customer.dto';
 import { Customer } from './entities/customer.entity';
 import { JwtAuthGuard } from '../../modules/auth/guards/jwt-auth.guard';
 import { PaginationResponseDto } from '../../common/dto/pagination-response.dto';
+import { ImportCustomersDto } from './dto/import-customers.dto';
+import { BatchActionDto } from './dto/batch-action.dto';
+import { BatchToggleStatusDto } from './dto/batch-toggle-status.dto';
+import { BatchUpdateTypeDto } from './dto/batch-update-type.dto';
+import { BatchAssignBranchDto } from './dto/batch-assign-branch.dto';
 
 @ApiTags('customers')
 @ApiBearerAuth()
@@ -51,6 +56,27 @@ export class CustomersController {
   })
   create(@Body() createCustomerDto: CreateCustomerDto): Promise<Customer> {
     return this.customersService.create(createCustomerDto);
+  }
+
+  @Post('import')
+  @ApiOperation({ summary: 'Import multiple customers' })
+  @ApiBody({ type: ImportCustomersDto })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'The customers have been successfully imported.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data.',
+  })
+  @ApiResponse({
+    status: HttpStatus.PARTIAL_CONTENT,
+    description: 'Some customers were not imported due to validation errors.',
+  })
+  importCustomers(
+    @Body() importCustomersDto: ImportCustomersDto,
+  ): Promise<any> {
+    return this.customersService.importCustomers(importCustomersDto.customers);
   }
 
   @Get()
@@ -209,5 +235,65 @@ export class CustomersController {
     @Body('amount') amount: number,
   ): Promise<Customer> {
     return this.customersService.updateBookingStats(id, amount);
+  }
+
+  @Patch('batch/toggle-status')
+  @ApiOperation({ summary: 'Toggle status of multiple customers' })
+  @ApiBody({ type: BatchToggleStatusDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The customer statuses have been successfully updated.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data.',
+  })
+  batchToggleStatus(@Body() dto: BatchToggleStatusDto) {
+    return this.customersService.batchToggleStatus(dto.ids, dto.status);
+  }
+
+  @Patch('batch/update-type')
+  @ApiOperation({ summary: 'Update type of multiple customers' })
+  @ApiBody({ type: BatchUpdateTypeDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The customer types have been successfully updated.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data.',
+  })
+  batchUpdateType(@Body() dto: BatchUpdateTypeDto) {
+    return this.customersService.batchUpdateType(dto.ids, dto.type);
+  }
+
+  @Delete('batch')
+  @ApiOperation({ summary: 'Delete multiple customers' })
+  @ApiBody({ type: BatchActionDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The customers have been successfully deleted.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data.',
+  })
+  batchDelete(@Body() dto: BatchActionDto) {
+    return this.customersService.batchDelete(dto.ids);
+  }
+
+  @Patch('batch/assign-branch')
+  @ApiOperation({ summary: 'Assign branch to multiple customers' })
+  @ApiBody({ type: BatchAssignBranchDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The branch has been successfully assigned to the customers.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data.',
+  })
+  batchAssignBranch(@Body() dto: BatchAssignBranchDto) {
+    return this.customersService.batchAssignBranch(dto.ids, dto.branchId);
   }
 }

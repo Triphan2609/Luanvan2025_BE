@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,6 +16,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { FilterCustomerDto } from './dto/filter-customer.dto';
 import { PaginationResponseDto } from '../../common/dto/pagination-response.dto';
+import { In } from 'typeorm';
 
 @Injectable()
 export class CustomersService {
@@ -228,5 +231,262 @@ export class CustomersService {
       totalVipCustomers,
       totalActiveCustomers,
     };
+  }
+
+  async importCustomers(customers: CreateCustomerDto[]): Promise<{
+    success: boolean;
+    imported: number;
+    errors: Array<{ customer: CreateCustomerDto; error: string }>;
+  }> {
+    const importResults = {
+      success: true,
+      imported: 0,
+      errors: [] as Array<{ customer: CreateCustomerDto; error: string }>,
+    };
+
+    // Keep track of phones and ID numbers in current batch to check for duplicates
+    const batchPhones = new Set<string>();
+    const batchIdNumbers = new Set<string>();
+
+    // Process customers in batches
+    for (const customerDto of customers) {
+      try {
+        // Check for duplicates in current batch
+        if (batchPhones.has(customerDto.phone)) {
+          throw new ConflictException(
+            `A customer with phone ${customerDto.phone} already exists in the import batch`,
+          );
+        }
+
+        if (customerDto.idNumber && batchIdNumbers.has(customerDto.idNumber)) {
+          throw new ConflictException(
+            `A customer with ID number ${customerDto.idNumber} already exists in the import batch`,
+          );
+        }
+
+        // Check for existing customer with the same phone in database
+        const existingPhone = await this.customersRepository.findOne({
+          where: { phone: customerDto.phone },
+        });
+        if (existingPhone) {
+          throw new ConflictException(
+            `A customer with phone ${customerDto.phone} already exists in the database`,
+          );
+        }
+
+        // Check for existing customer with the same ID number in database
+        if (customerDto.idNumber) {
+          const existingIdNumber = await this.customersRepository.findOne({
+            where: { idNumber: customerDto.idNumber },
+          });
+          if (existingIdNumber) {
+            throw new ConflictException(
+              `A customer with ID number ${customerDto.idNumber} already exists in the database`,
+            );
+          }
+        }
+
+        // Generate customer code
+        const customerCount =
+          (await this.customersRepository.count()) + importResults.imported;
+        const customerCode = `KH${String(customerCount + 1).padStart(4, '0')}`;
+
+        // Create new customer
+        const customer = this.customersRepository.create({
+          ...customerDto,
+          customer_code: customerCode,
+          status: CustomerStatus.ACTIVE,
+          totalBookings: 0,
+          totalSpent: 0,
+        });
+
+        await this.customersRepository.save(customer);
+        importResults.imported += 1;
+
+        // Add to batch tracking
+        batchPhones.add(customerDto.phone);
+        if (customerDto.idNumber) {
+          batchIdNumbers.add(customerDto.idNumber);
+        }
+      } catch (error) {
+        importResults.success = false;
+        importResults.errors.push({
+          customer: customerDto,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    // If no customers were imported and there are errors, throw an exception
+    if (importResults.imported === 0 && importResults.errors.length > 0) {
+      throw new HttpException(
+        {
+          message: 'Failed to import any customers',
+          errors: importResults.errors,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // If some customers were imported but there are also errors, return partial success
+    if (importResults.imported > 0 && importResults.errors.length > 0) {
+      throw new HttpException(
+        {
+          message: `Imported ${importResults.imported} customers with ${importResults.errors.length} errors`,
+          importResults,
+        },
+        HttpStatus.PARTIAL_CONTENT,
+      );
+    }
+
+    return importResults;
+  }
+
+  // Batch operations
+  async batchToggleStatus(
+    ids: string[],
+    status: CustomerStatus,
+  ): Promise<{ success: boolean; affected: number }> {
+    try {
+      // Validate that all ids exist
+      await this.validateCustomerIds(ids);
+
+      const result = await this.customersRepository
+        .createQueryBuilder()
+        .update(Customer)
+        .set({ status })
+        .where('id IN (:...ids)', { ids })
+        .execute();
+
+      return {
+        success: true,
+        affected: result.affected || 0,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          message: 'Failed to update customer statuses',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  async batchUpdateType(
+    ids: string[],
+    type: CustomerType,
+  ): Promise<{ success: boolean; affected: number }> {
+    try {
+      // Validate that all ids exist
+      await this.validateCustomerIds(ids);
+
+      const result = await this.customersRepository
+        .createQueryBuilder()
+        .update(Customer)
+        .set({ type })
+        .where('id IN (:...ids)', { ids })
+        .execute();
+
+      return {
+        success: true,
+        affected: result.affected || 0,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          message: 'Failed to update customer types',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  async batchDelete(
+    ids: string[],
+  ): Promise<{ success: boolean; affected: number }> {
+    try {
+      // Validate that all ids exist
+      await this.validateCustomerIds(ids);
+
+      const result = await this.customersRepository
+        .createQueryBuilder()
+        .delete()
+        .from(Customer)
+        .where('id IN (:...ids)', { ids })
+        .execute();
+
+      return {
+        success: true,
+        affected: result.affected || 0,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          message: 'Failed to delete customers',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  async batchAssignBranch(
+    ids: string[],
+    branchId: number,
+  ): Promise<{ success: boolean; affected: number }> {
+    try {
+      // Validate that all ids exist
+      await this.validateCustomerIds(ids);
+
+      // TODO: Validate that branch exists
+      // This should be checked in a real implementation
+
+      const result = await this.customersRepository
+        .createQueryBuilder()
+        .update(Customer)
+        .set({ branchId })
+        .where('id IN (:...ids)', { ids })
+        .execute();
+
+      return {
+        success: true,
+        affected: result.affected || 0,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          message: 'Failed to assign branch to customers',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // Helper method to validate customer IDs
+  private async validateCustomerIds(ids: string[]): Promise<void> {
+    if (!ids.length) {
+      throw new HttpException(
+        {
+          message: 'No customer IDs provided',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const foundCustomers = await this.customersRepository.count({
+      where: { id: In(ids) },
+    });
+
+    if (foundCustomers !== ids.length) {
+      throw new HttpException(
+        {
+          message: `Some customers not found. Found ${foundCustomers} out of ${ids.length}`,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }
