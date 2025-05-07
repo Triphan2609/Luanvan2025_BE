@@ -49,15 +49,39 @@ export class RoomsService {
   }
 
   async findAll(
-    floor?: number,
+    floor?: any,
     roomTypeId?: number,
     status?: string,
     branchId?: number,
   ): Promise<Room[]> {
+    // Create a clean where object
     const where: FindOptionsWhere<Room> = { isActive: true };
 
-    if (floor) {
-      where.floor = floor;
+    // Handle the floor parameter - detailed validation and warnings
+    if (floor !== undefined && floor !== null) {
+      // If it's a string that can be converted to a number
+      if (typeof floor === 'string' && !isNaN(Number(floor))) {
+        where.floor = Number(floor);
+      }
+      // If it's a number, use directly
+      else if (typeof floor === 'number') {
+        where.floor = floor;
+      }
+      // If it's an object with floorId property (from frontend)
+      else if (
+        typeof floor === 'object' &&
+        floor !== null &&
+        'floorId' in floor
+      ) {
+        const floorObj = floor as { floorId: any };
+        if (!isNaN(Number(floorObj.floorId))) {
+          where.floorId = Number(floorObj.floorId);
+        }
+      }
+      // If it's something else, ignore and warn
+      else {
+        console.warn(`Invalid floor parameter ignored:`, floor);
+      }
     }
 
     if (roomTypeId) {
@@ -72,13 +96,19 @@ export class RoomsService {
       where.branchId = branchId;
     }
 
-    const rooms = await this.roomsRepository.find({
-      where,
-      order: { floor: 'ASC', roomCode: 'ASC' },
-      relations: ['roomType'],
-    });
+    try {
+      const rooms = await this.roomsRepository.find({
+        where,
+        order: { floor: 'ASC', roomCode: 'ASC' },
+        relations: ['roomType'],
+      });
 
-    return rooms;
+      return rooms;
+    } catch (error) {
+      console.error('Error in findAll method:', error);
+      console.error('SQL query parameters:', where);
+      throw error;
+    }
   }
 
   async findOne(id: number): Promise<Room> {

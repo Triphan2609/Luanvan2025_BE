@@ -20,15 +20,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     // Find the account by id (sub) instead of username
     const account = await this.accountsService.findById(payload.sub);
+
     if (!account) {
       throw new Error('Tài khoản không tồn tại');
     }
+
+    // Xử lý trường hợp thiếu role trong payload nhưng account có role
+    let role = payload.role;
+
+    if (!role && account.role) {
+      role = account.role.name;
+    }
+
     return {
       id: account.id,
       username: account.username,
       fullName: account.fullName,
       email: account.email,
-      role: payload.role,
+      role: role,
       status: account.status,
       lastLogin: account.lastLogin,
     };

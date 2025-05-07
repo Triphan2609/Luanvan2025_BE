@@ -30,11 +30,21 @@ export class AccountsService {
   async create(createAccountDto: CreateAccountDto): Promise<Account> {
     const { roleId, password, ...accountData } = createAccountDto;
 
+    console.log(`Creating account with roleId: ${roleId}`);
+
     // Kiểm tra vai trò
     const role = await this.roleRepository.findOne({ where: { id: roleId } });
     if (!role) {
+      console.log(`Role not found with ID: ${roleId}`);
       throw new NotFoundException('Vai trò không tồn tại');
     }
+
+    console.log(
+      `Role found: ${JSON.stringify({
+        id: role.id,
+        name: role.name,
+      })}`,
+    );
 
     // Mã hóa mật khẩu
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -46,7 +56,45 @@ export class AccountsService {
       role,
     });
 
-    return this.accountsRepository.save(account);
+    console.log(
+      `Account created with data: ${JSON.stringify({
+        username: account.username,
+        fullName: account.fullName,
+        email: account.email,
+        roleId: role.id,
+        roleName: role.name,
+      })}`,
+    );
+
+    const savedAccount = await this.accountsRepository.save(account);
+
+    console.log(`Account saved with ID: ${savedAccount.id}`);
+
+    // Load the account with relationship again to ensure everything is properly saved
+    const accountWithRelations = await this.accountsRepository.findOne({
+      where: { id: savedAccount.id },
+      relations: ['role'],
+    });
+
+    if (!accountWithRelations) {
+      // Trả về tài khoản đã lưu nếu không thể tải lại với relations
+      return savedAccount;
+    }
+
+    console.log(
+      `Account loaded with relationships: ${JSON.stringify({
+        id: accountWithRelations.id,
+        username: accountWithRelations.username,
+        role: accountWithRelations.role
+          ? {
+              id: accountWithRelations.role.id,
+              name: accountWithRelations.role.name,
+            }
+          : null,
+      })}`,
+    );
+
+    return accountWithRelations;
   }
 
   async update(

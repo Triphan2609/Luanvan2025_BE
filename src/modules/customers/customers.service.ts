@@ -46,9 +46,8 @@ export class CustomersService {
       );
     }
 
-    // Generate customer code
-    const customerCount = await this.customersRepository.count();
-    const customerCode = `KH${String(customerCount + 1).padStart(4, '0')}`;
+    // Generate unique customer code
+    const customerCode = await this.generateUniqueCustomerCode();
 
     // Create new customer
     const customer = this.customersRepository.create({
@@ -286,10 +285,10 @@ export class CustomersService {
           }
         }
 
-        // Generate customer code
-        const customerCount =
-          (await this.customersRepository.count()) + importResults.imported;
-        const customerCode = `KH${String(customerCount + 1).padStart(4, '0')}`;
+        // Generate unique customer code
+        const customerCode = await this.generateUniqueCustomerCode(
+          importResults.imported,
+        );
 
         // Create new customer
         const customer = this.customersRepository.create({
@@ -486,6 +485,123 @@ export class CustomersService {
           message: `Some customers not found. Found ${foundCustomers} out of ${ids.length}`,
         },
         HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // Helper method to generate a unique customer code
+  private async generateUniqueCustomerCode(
+    offset: number = 0,
+  ): Promise<string> {
+    let isCodeUnique = false;
+    let customerCode = '';
+    let attempt = 0;
+
+    while (!isCodeUnique) {
+      // Get the base count
+      const customerCount =
+        (await this.customersRepository.count()) + offset + attempt;
+      customerCode = `KH${String(customerCount + 1).padStart(4, '0')}`;
+
+      // Check if code already exists
+      const existingCode = await this.customersRepository.findOne({
+        where: { customer_code: customerCode },
+      });
+
+      if (!existingCode) {
+        isCodeUnique = true;
+      } else {
+        // If code exists, increment attempt counter to try next number
+        attempt++;
+        // Add safety limit to prevent infinite loop
+        if (attempt > 100) {
+          throw new ConflictException(
+            'Unable to generate a unique customer code after multiple attempts',
+          );
+        }
+      }
+    }
+
+    return customerCode;
+  }
+
+  // Phương thức tạo khách hàng vãng lai
+  async createWalkInCustomer(customerData: {
+    name: string;
+    phone: string;
+    idCard: string;
+    branchId: number;
+    type: string;
+    isWalkIn: boolean;
+  }): Promise<Customer> {
+    try {
+      // Kiểm tra xem có khách hàng với số điện thoại này chưa
+      const existingCustomer = await this.customersRepository.findOne({
+        where: { phone: customerData.phone },
+      });
+
+      // Nếu đã có khách hàng với số điện thoại này, trả về khách hàng đó
+      if (existingCustomer) {
+        return existingCustomer;
+      }
+
+      // Tạo mã khách hàng cho khách vãng lai
+      const customerCode = await this.generateUniqueCustomerCode();
+
+      // Tạo khách hàng mới
+      const customer = this.customersRepository.create({
+        customer_code: customerCode,
+        name: customerData.name,
+        phone: customerData.phone,
+        idNumber: customerData.idCard,
+        branchId: customerData.branchId,
+        type:
+          customerData.type === 'regular'
+            ? CustomerType.NORMAL
+            : CustomerType.VIP,
+        status: CustomerStatus.ACTIVE,
+        totalBookings: 0,
+        totalSpent: 0,
+      });
+
+      return await this.customersRepository.save(customer);
+    } catch (error) {
+      throw new Error(
+        `Error creating walk-in customer: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  // Phương thức tạo đối tượng khách hàng tạm thời không lưu vào database
+  createTempCustomer(customerData: {
+    name: string;
+    phone: string;
+    idCard: string;
+    branchId: number;
+  }): Customer {
+    try {
+      // Tạo mã khách hàng tạm thời
+      const tempCode = `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      // Tạo đối tượng khách hàng mới nhưng không lưu vào database
+      const tempCustomer = {
+        id: tempCode,
+        customer_code: `TMP${tempCode.substring(0, 6)}`,
+        name: customerData.name,
+        phone: customerData.phone,
+        idNumber: customerData.idCard,
+        branchId: customerData.branchId,
+        type: CustomerType.NORMAL,
+        status: CustomerStatus.ACTIVE,
+        totalBookings: 0,
+        totalSpent: 0,
+      } as Customer;
+
+      // Trả về đối tượng khách hàng nhưng không lưu vào database
+      return tempCustomer;
+    } catch (error) {
+      throw new Error(
+        `Error creating temporary customer: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

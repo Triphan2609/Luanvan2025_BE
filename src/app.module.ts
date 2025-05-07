@@ -23,6 +23,7 @@ import { RoomsModule } from './modules/rooms/rooms.module';
 import { StuffModule } from './modules/stuff/stuff.module';
 import { AmenitiesModule } from './modules/amenities/amenities.module';
 import { FloorsModule } from './modules/floors/floors.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { FloorsModule } from './modules/floors/floors.module';
     StuffModule,
     AmenitiesModule,
     FloorsModule,
+    BookingsModule,
   ],
   providers: [
     {
