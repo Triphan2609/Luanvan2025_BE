@@ -24,6 +24,8 @@ import { StuffModule } from './modules/stuff/stuff.module';
 import { AmenitiesModule } from './modules/amenities/amenities.module';
 import { FloorsModule } from './modules/floors/floors.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
+import { EmailModule } from './modules/email/email.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -74,6 +76,8 @@ import { BookingsModule } from './modules/bookings/bookings.module';
     AmenitiesModule,
     FloorsModule,
     BookingsModule,
+    EmailModule,
+    PaymentsModule,
   ],
   providers: [
     {

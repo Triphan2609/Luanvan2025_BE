@@ -30,6 +30,9 @@ export class Branch {
   @Column({ unique: true })
   email: string;
 
+  @Column({ nullable: true })
+  website: string;
+
   @ManyToOne(() => BranchType, (branchType) => branchType.branches, {
     eager: true,
   })

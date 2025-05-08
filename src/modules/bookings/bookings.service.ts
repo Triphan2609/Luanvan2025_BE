@@ -3,16 +3,23 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, ILike, Repository, In } from 'typeorm';
-import { Booking, BookingStatus } from './entities/booking.entity';
+import {
+  Booking,
+  BookingStatus,
+  PaymentStatus,
+} from './entities/booking.entity';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { QueryBookingDto } from './dto/query-booking.dto';
 import { RoomsService } from '../rooms/rooms.service';
 import { CustomersService } from '../customers/customers.service';
 import { RoomStatus } from '../rooms/entities/room.entity';
+import { PaymentsService } from '../payments/payments.service';
 
 // Add this interface after imports
 interface DailyAvailability {
@@ -28,6 +35,8 @@ export class BookingsService {
     private bookingsRepository: Repository<Booking>,
     private roomsService: RoomsService,
     private customersService: CustomersService,
+    @Inject(forwardRef(() => PaymentsService))
+    private paymentsService: PaymentsService,
   ) {}
 
   async create(createBookingDto: CreateBookingDto): Promise<Booking> {
@@ -930,5 +939,47 @@ export class BookingsService {
     }
 
     return result;
+  }
+
+  // Update payment status for a booking
+  async updatePaymentStatus(
+    id: string,
+    paymentStatus: string,
+  ): Promise<Booking> {
+    const booking = await this.findOne(id);
+
+    // Validate that paymentStatus is one of the valid values
+    const validStatuses = ['unpaid', 'partial', 'paid', 'refunded'];
+    if (!validStatuses.includes(paymentStatus)) {
+      throw new BadRequestException(
+        `Invalid payment status. Must be one of: ${validStatuses.join(', ')}`,
+      );
+    }
+
+    // Update payment status
+    booking.paymentStatus = paymentStatus as PaymentStatus;
+    return await this.bookingsRepository.save(booking);
+  }
+
+  // Send invoice by email
+  async sendInvoiceEmail(id: string, email: string) {
+    try {
+      // First check if the booking exists
+      const booking = await this.findOne(id);
+
+      // Then delegate to payments service to send the invoice
+      if (
+        this.paymentsService &&
+        typeof this.paymentsService.sendInvoiceEmail === 'function'
+      ) {
+        return this.paymentsService.sendInvoiceEmail(id, email);
+      } else {
+        throw new Error('Payment service not configured for email sending');
+      }
+    } catch (error) {
+      throw new NotFoundException(
+        `Could not find booking with ID ${id} or email service is not configured`,
+      );
+    }
   }
 }

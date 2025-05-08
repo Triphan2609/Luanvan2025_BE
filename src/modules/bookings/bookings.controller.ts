@@ -286,4 +286,36 @@ export class BookingsController {
   ): Promise<Booking> {
     return this.bookingsService.reject(id, reason);
   }
+
+  @Post('invoice/:bookingId/send-email')
+  sendInvoiceEmail(
+    @Param('bookingId') bookingId: string,
+    @Body() body: { email: string },
+  ) {
+    return this.bookingsService.sendInvoiceEmail(bookingId, body.email);
+  }
+
+  @Patch(':id/payment-status')
+  @ApiOperation({ summary: 'Update booking payment status' })
+  @ApiParam({ name: 'id', description: 'Booking ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { paymentStatus: { type: 'string' } },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Payment status updated successfully',
+    type: Booking,
+  })
+  updatePaymentStatus(
+    @Param('id') id: string,
+    @Body() updateDto: { paymentStatus: string },
+  ): Promise<Booking> {
+    return this.bookingsService.updatePaymentStatus(
+      id,
+      updateDto.paymentStatus,
+    );
+  }
 }
