@@ -26,24 +26,53 @@ export class CustomersService {
   ) {}
 
   async create(createCustomerDto: CreateCustomerDto): Promise<Customer> {
-    // Check for existing customer with the same phone
-    const existingPhone = await this.customersRepository.findOne({
-      where: { phone: createCustomerDto.phone },
-    });
-    if (existingPhone) {
-      throw new ConflictException(
-        'A customer with this phone number already exists',
+    // Validate branchId is provided
+    if (!createCustomerDto.branchId) {
+      throw new HttpException(
+        'Branch ID is required for customer registration',
+        HttpStatus.BAD_REQUEST,
       );
     }
 
-    // Check for existing customer with the same ID number
+    // Check for existing customer with the same phone in the same branch
+    const existingPhone = await this.customersRepository.findOne({
+      where: {
+        phone: createCustomerDto.phone,
+        branchId: createCustomerDto.branchId,
+      },
+    });
+    if (existingPhone) {
+      throw new ConflictException(
+        'A customer with this phone number already exists in this branch',
+      );
+    }
+
+    // Check for existing customer with the same ID number in the same branch
     const existingIdNumber = await this.customersRepository.findOne({
-      where: { idNumber: createCustomerDto.idNumber },
+      where: {
+        idNumber: createCustomerDto.idNumber,
+        branchId: createCustomerDto.branchId,
+      },
     });
     if (existingIdNumber) {
       throw new ConflictException(
-        'A customer with this ID number already exists',
+        'A customer with this ID number already exists in this branch',
       );
+    }
+
+    // Check for existing email if provided
+    if (createCustomerDto.email) {
+      const existingEmail = await this.customersRepository.findOne({
+        where: {
+          email: createCustomerDto.email,
+          branchId: createCustomerDto.branchId,
+        },
+      });
+      if (existingEmail) {
+        throw new ConflictException(
+          'A customer with this email already exists in this branch',
+        );
+      }
     }
 
     // Generate unique customer code
@@ -153,29 +182,53 @@ export class CustomersService {
   ): Promise<Customer> {
     const customer = await this.findOne(id);
 
-    // Check for duplicate phone number
+    // If changing branch, need to validate conflicts in new branch
+    const targetBranchId = updateCustomerDto.branchId || customer.branchId;
+
+    // Check for duplicate phone number in the same branch
     if (updateCustomerDto.phone && updateCustomerDto.phone !== customer.phone) {
       const existingPhone = await this.customersRepository.findOne({
-        where: { phone: updateCustomerDto.phone },
+        where: {
+          phone: updateCustomerDto.phone,
+          branchId: targetBranchId,
+        },
       });
-      if (existingPhone) {
+      if (existingPhone && existingPhone.id !== id) {
         throw new ConflictException(
-          'A customer with this phone number already exists',
+          'A customer with this phone number already exists in this branch',
         );
       }
     }
 
-    // Check for duplicate ID number
+    // Check for duplicate ID number in the same branch
     if (
       updateCustomerDto.idNumber &&
       updateCustomerDto.idNumber !== customer.idNumber
     ) {
       const existingIdNumber = await this.customersRepository.findOne({
-        where: { idNumber: updateCustomerDto.idNumber },
+        where: {
+          idNumber: updateCustomerDto.idNumber,
+          branchId: targetBranchId,
+        },
       });
-      if (existingIdNumber) {
+      if (existingIdNumber && existingIdNumber.id !== id) {
         throw new ConflictException(
-          'A customer with this ID number already exists',
+          'A customer with this ID number already exists in this branch',
+        );
+      }
+    }
+
+    // Check for duplicate email in the same branch
+    if (updateCustomerDto.email && updateCustomerDto.email !== customer.email) {
+      const existingEmail = await this.customersRepository.findOne({
+        where: {
+          email: updateCustomerDto.email,
+          branchId: targetBranchId,
+        },
+      });
+      if (existingEmail && existingEmail.id !== id) {
+        throw new ConflictException(
+          'A customer with this email already exists in this branch',
         );
       }
     }
@@ -535,39 +588,70 @@ export class CustomersService {
     isWalkIn: boolean;
   }): Promise<Customer> {
     try {
-      // Kiểm tra xem có khách hàng với số điện thoại này chưa
+      // Validate branchId is provided
+      if (!customerData.branchId) {
+        throw new HttpException(
+          'Branch ID is required for customer registration',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // First try to find the customer by phone and branch
       const existingCustomer = await this.customersRepository.findOne({
-        where: { phone: customerData.phone },
+        where: {
+          phone: customerData.phone,
+          branchId: customerData.branchId,
+        },
       });
 
-      // Nếu đã có khách hàng với số điện thoại này, trả về khách hàng đó
       if (existingCustomer) {
+        // Customer already exists, just return it
         return existingCustomer;
       }
 
-      // Tạo mã khách hàng cho khách vãng lai
+      // Generate a new customer code
       const customerCode = await this.generateUniqueCustomerCode();
 
-      // Tạo khách hàng mới
-      const customer = this.customersRepository.create({
+      // Determine customer type
+      const customerType =
+        customerData.type &&
+        (customerData.type.toUpperCase() === 'VIP' ||
+          customerData.type.toLowerCase() === 'vip')
+          ? CustomerType.VIP
+          : CustomerType.NORMAL;
+
+      // Create a new customer
+      const newCustomer = this.customersRepository.create({
         customer_code: customerCode,
         name: customerData.name,
         phone: customerData.phone,
         idNumber: customerData.idCard,
         branchId: customerData.branchId,
-        type:
-          customerData.type === 'regular'
-            ? CustomerType.NORMAL
-            : CustomerType.VIP,
+        type: customerType,
         status: CustomerStatus.ACTIVE,
         totalBookings: 0,
         totalSpent: 0,
       });
 
-      return await this.customersRepository.save(customer);
+      // Save and return the new customer
+      return this.customersRepository.save(newCustomer);
     } catch (error) {
-      throw new Error(
-        `Error creating walk-in customer: ${error instanceof Error ? error.message : String(error)}`,
+      // Handle conflict errors (unique constraints)
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+
+      // For other errors, create a temporary customer
+      if (customerData.isWalkIn) {
+        return this.createTempCustomer(customerData);
+      }
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
+      throw new HttpException(
+        'Error creating customer: ' + errorMessage,
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }

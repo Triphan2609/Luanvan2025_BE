@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Booking } from '../../bookings/entities/booking.entity';
 import { PaymentMethod } from './payment-method.entity';
+import { Branch } from '../../branches/entities/branch.entity';
 
 export enum PaymentStatus {
   PENDING = 'pending',
@@ -23,6 +24,11 @@ export enum PaymentType {
   FULL = 'full',
   EXTRA = 'extra',
   REFUND = 'refund',
+}
+
+export enum PaymentTarget {
+  HOTEL = 'hotel',
+  RESTAURANT = 'restaurant',
 }
 
 @Entity('payments')
@@ -47,18 +53,28 @@ export class Payment {
   })
   type: PaymentType;
 
+  @Column({
+    type: 'enum',
+    enum: PaymentTarget,
+    default: PaymentTarget.HOTEL,
+  })
+  target: PaymentTarget;
+
   @Column({ nullable: true })
   transactionId: string;
 
   @Column({ nullable: true })
   notes: string;
 
-  @ManyToOne(() => Booking)
+  @ManyToOne(() => Booking, { nullable: true })
   @JoinColumn({ name: 'bookingId' })
   booking: Booking;
 
-  @Column()
+  @Column({ nullable: true })
   bookingId: string;
+
+  @Column({ nullable: true })
+  restaurantOrderId: string;
 
   @ManyToOne(() => PaymentMethod)
   @JoinColumn({ name: 'methodId' })
@@ -66,6 +82,17 @@ export class Payment {
 
   @Column()
   methodId: number;
+
+  @ManyToOne(() => Branch, {
+    nullable: true,
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  })
+  @JoinColumn({ name: 'branchId' })
+  branch: Branch;
+
+  @Column({ nullable: true })
+  branchId: number;
 
   @CreateDateColumn()
   createdAt: Date;

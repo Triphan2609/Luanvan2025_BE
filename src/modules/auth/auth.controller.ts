@@ -24,10 +24,9 @@ export class AuthController {
   @Public()
   @Post('login')
   async login(@Body() body: { username: string; password: string }) {
-    console.log(`Login request received for username: ${body.username}`);
     try {
       const result = await this.authService.login(body.username, body.password);
-      console.log(`Login successful for user ${body.username}`);
+
       return result;
     } catch (error) {
       console.error(`Login failed for user ${body.username}: ${error.message}`);

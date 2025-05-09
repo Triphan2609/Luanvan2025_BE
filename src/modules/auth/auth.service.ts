@@ -42,27 +42,13 @@ export class AuthService {
 
   async login(username: string, password: string): Promise<any> {
     // Log thông tin đăng nhập để debug
-    console.log(`Attempting login with username: ${username}`);
 
     const account = await this.accountsService.findByUsername(username);
     if (!account) {
-      console.log(`Login failed: Account not found for username ${username}`);
       throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không đúng');
     }
 
-    console.log(
-      `Account found: ${JSON.stringify({
-        id: account.id,
-        username: account.username,
-        status: account.status,
-        role: account.role
-          ? { id: account.role.id, name: account.role.name }
-          : null,
-      })}`,
-    );
-
     if (account.status === 'locked') {
-      console.log(`Login failed: Account is locked`);
       throw new ForbiddenException('Tài khoản của bạn đã bị khóa');
     }
 
@@ -76,10 +62,7 @@ export class AuthService {
         throw new UnauthorizedException('Lỗi xác thực mật khẩu');
       }
 
-      console.log(`Password validation result: ${isPasswordValid}`);
-
       if (!isPasswordValid) {
-        console.log(`Login failed: Invalid password`);
         throw new UnauthorizedException(
           'Tên đăng nhập hoặc mật khẩu không đúng',
         );
@@ -92,25 +75,11 @@ export class AuthService {
       const accountWithRoles = await this.accountsService.findById(account.id);
 
       if (!accountWithRoles) {
-        console.log(
-          `Error: Could not reload account with roles for id ${account.id}`,
-        );
         throw new UnauthorizedException('Lỗi tải thông tin tài khoản');
       }
 
-      console.log(
-        `Account with roles: ${JSON.stringify({
-          id: accountWithRoles.id,
-          username: accountWithRoles.username,
-          role: accountWithRoles.role
-            ? { id: accountWithRoles.role.id, name: accountWithRoles.role.name }
-            : null,
-        })}`,
-      );
-
       // Generate tokens
       const tokens = this.getTokens(accountWithRoles);
-      console.log(`Tokens generated successfully for ${username}`);
 
       // Save refresh token
       await this.saveRefreshToken(account.id, tokens.refreshToken);
@@ -244,22 +213,11 @@ export class AuthService {
       roleName = account.role.name || 'No Role';
     }
 
-    // Log account data trước khi tạo token
-    console.log(
-      `Creating tokens for account: ${JSON.stringify({
-        id: accountId,
-        username: username,
-        role: roleName,
-      })}`,
-    );
-
     const payload = {
       sub: accountId,
       username: username,
       role: roleName,
     };
-
-    console.log(`JWT payload: ${JSON.stringify(payload)}`);
 
     // Create access token with short expiry
     const accessToken = this.jwtService.sign(payload, {

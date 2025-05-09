@@ -4,6 +4,8 @@ import {
   IsEmail,
   IsEnum,
   IsDateString,
+  IsNumber,
+  IsNotEmpty,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { CustomerType, Gender } from '../entities/customer.entity';
@@ -86,8 +88,9 @@ export class CreateCustomerDto {
   @ApiProperty({
     description: 'Branch ID where the customer is registered',
     example: 1,
-    required: false,
+    required: true,
   })
-  @IsOptional()
-  branchId?: number;
+  @IsNumber()
+  @IsNotEmpty()
+  branchId: number;
 }

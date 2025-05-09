@@ -9,16 +9,20 @@ import {
   IsInt,
   Min,
 } from 'class-validator';
-import { PaymentType } from '../entities/payment.entity';
+import {
+  PaymentType,
+  PaymentStatus,
+  PaymentTarget,
+} from '../entities/payment.entity';
 
 export class CreatePaymentDto {
   @ApiProperty({
     description: 'Booking ID',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
-  bookingId: string;
+  bookingId?: string;
 
   @ApiProperty({ description: 'Payment amount', example: 1000000 })
   @IsNotEmpty()
@@ -44,6 +48,24 @@ export class CreatePaymentDto {
   type?: PaymentType;
 
   @ApiProperty({
+    description: 'Payment status',
+    example: 'completed',
+    enum: PaymentStatus,
+  })
+  @IsOptional()
+  @IsEnum(PaymentStatus)
+  status?: PaymentStatus;
+
+  @ApiProperty({
+    description: 'Payment target',
+    example: 'restaurant',
+    enum: PaymentTarget,
+  })
+  @IsOptional()
+  @IsEnum(PaymentTarget)
+  target?: PaymentTarget;
+
+  @ApiProperty({
     description: 'Transaction ID from payment provider',
     example: 'TRANS123456',
   })
@@ -58,4 +80,21 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiProperty({
+    description: 'Restaurant order ID',
+    example: 'ORD123456',
+  })
+  @IsOptional()
+  @IsString()
+  restaurantOrderId?: string;
+
+  @ApiProperty({
+    description: 'Branch ID',
+    example: 1,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  branchId?: number;
 }

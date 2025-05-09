@@ -78,9 +78,6 @@ export class BookingsService {
 
           // Nếu đã tồn tại, sử dụng luôn khách hàng này
           customerId = existingCustomer.id;
-          console.log(
-            `Found existing customer with phone ${createBookingDto.customerTemp.phone}, ID: ${customerId}`,
-          );
         } catch (error) {
           // Nếu không tìm thấy khách hàng với số điện thoại này
           // Kiểm tra xem có lưu thông tin khách hàng hay không
@@ -100,7 +97,6 @@ export class BookingsService {
 
             // Lấy ID của khách hàng vừa tạo
             customerId = walkInCustomer.id;
-            console.log(`Created new walk-in customer with ID: ${customerId}`);
           } else {
             // Tạo một đối tượng Customer tạm thời không lưu vào database
             // Để đảm bảo có customerId cho đặt phòng
@@ -639,8 +635,6 @@ export class BookingsService {
           parsedFloorId = Number(floorIdValue);
         }
       }
-
-      console.log(`Parsed floorId: ${parsedFloorId}`);
     }
 
     try {
@@ -651,8 +645,6 @@ export class BookingsService {
         undefined, // Không lọc theo trạng thái
         branchId,
       );
-
-      console.log(`Found ${rooms.length} rooms in branch ${branchId}`);
 
       // Lọc phòng theo tầng nếu có floorId
       const filteredRooms = parsedFloorId
@@ -716,8 +708,6 @@ export class BookingsService {
         // Bỏ cache query để luôn lấy dữ liệu mới nhất khi force refresh
         ...(forceRefresh ? { cache: false } : {}),
       });
-
-      console.log(`Found ${bookings.length} bookings in the date range`);
 
       // Xây dựng dữ liệu lịch
       return filteredRooms.map((room) => {
@@ -795,7 +785,7 @@ export class BookingsService {
         `Room ${room.roomCode} has ${normalizedBookings.length} bookings:`,
       );
       normalizedBookings.forEach((booking: any, index) => {
-        console.log(`Booking ${index + 1}:`, {
+        console.log({
           id: booking.id,
           status: booking.status,
           checkIn: booking.normalizedCheckIn?.toISOString(),
@@ -856,7 +846,7 @@ export class BookingsService {
           `Date ${dateWithoutTime.toISOString()} has ${overlappingBookings.length} overlapping bookings for Room ${room.roomCode}`,
         );
         overlappingBookings.forEach((b: any, i) => {
-          console.log(`  Overlapping booking ${i + 1}:`, {
+          console.log({
             id: b.id,
             status: b.status,
             checkIn: b.normalizedCheckIn?.toISOString(),

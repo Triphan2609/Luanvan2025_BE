@@ -26,6 +26,7 @@ import { FloorsModule } from './modules/floors/floors.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { EmailModule } from './modules/email/email.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { RestaurantModule } from './modules/restaurant/restaurant.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     BookingsModule,
     EmailModule,
     PaymentsModule,
+    RestaurantModule,
   ],
   providers: [
     {

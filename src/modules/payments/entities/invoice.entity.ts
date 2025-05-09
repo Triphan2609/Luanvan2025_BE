@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Booking } from '../../bookings/entities/booking.entity';
 import { Payment } from './payment.entity';
+import { Branch } from '../../branches/entities/branch.entity';
 
 // Define the InvoiceStatus enum
 export enum InvoiceStatus {
@@ -17,6 +18,11 @@ export enum InvoiceStatus {
   PAID = 'paid',
   OVERDUE = 'overdue',
   CANCELLED = 'cancelled',
+}
+
+export enum InvoiceTarget {
+  HOTEL = 'hotel',
+  RESTAURANT = 'restaurant',
 }
 
 @Entity('invoices')
@@ -45,12 +51,22 @@ export class Invoice {
   @Column({ type: 'date', nullable: true })
   dueDate: Date;
 
-  @ManyToOne(() => Booking)
+  @ManyToOne(() => Booking, { nullable: true })
   @JoinColumn({ name: 'bookingId' })
   booking: Booking;
 
-  @Column()
+  @Column({ nullable: true })
   bookingId: string;
+
+  @Column({ nullable: true })
+  restaurantOrderId: string;
+
+  @Column({
+    type: 'enum',
+    enum: InvoiceTarget,
+    default: InvoiceTarget.HOTEL,
+  })
+  target: InvoiceTarget;
 
   @OneToMany(() => Payment, (payment) => payment.booking)
   payments: Payment[];
@@ -58,8 +74,16 @@ export class Invoice {
   @Column({ default: false })
   isSent: boolean;
 
+  @ManyToOne(() => Branch, {
+    nullable: true,
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  })
+  @JoinColumn({ name: 'branchId' })
+  branch: Branch;
+
   @Column({ nullable: true })
-  pdfPath: string;
+  branchId: number;
 
   @CreateDateColumn()
   createdAt: Date;

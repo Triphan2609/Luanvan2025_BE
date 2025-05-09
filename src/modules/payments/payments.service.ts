@@ -7,7 +7,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Payment, PaymentStatus, PaymentType } from './entities/payment.entity';
+import {
+  Payment,
+  PaymentStatus,
+  PaymentType,
+  PaymentTarget,
+} from './entities/payment.entity';
 import {
   PaymentMethod,
   PaymentMethodType,
@@ -22,6 +27,7 @@ import { ProcessRefundDto } from './dto/process-refund.dto';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 import { UpdateBankAccountDto } from './dto/update-bank-account.dto';
 import { ConfigService } from '@nestjs/config';
+import { InvoiceTarget } from './entities/invoice.entity';
 
 // Define a booking interface to use instead of 'any'
 interface BookingData {
@@ -54,6 +60,7 @@ interface BookingData {
     phone?: string;
     email?: string;
     website?: string;
+    id?: number;
   };
 }
 
@@ -185,13 +192,41 @@ export class PaymentsService {
   }
 
   async create(createPaymentDto: CreatePaymentDto) {
-    // Kiểm tra booking có tồn tại không
-    const booking = await this.bookingsService.findOne(
-      createPaymentDto.bookingId,
-    );
-    if (!booking) {
-      throw new NotFoundException(
-        `Không tìm thấy booking với ID ${createPaymentDto.bookingId}`,
+    // Nếu là thanh toán cho nhà hàng
+    if (
+      createPaymentDto.target === PaymentTarget.RESTAURANT &&
+      createPaymentDto.restaurantOrderId
+    ) {
+      // TODO: Kiểm tra order nhà hàng khi module restaurant được phát triển
+      // const restaurantOrder = await this.restaurantOrderService.findOne(createPaymentDto.restaurantOrderId);
+      // if (!restaurantOrder) {
+      //   throw new NotFoundException(
+      //     `Không tìm thấy order nhà hàng với ID ${createPaymentDto.restaurantOrderId}`,
+      //   );
+      // }
+    }
+    // Nếu là thanh toán cho khách sạn
+    else if (
+      createPaymentDto.target === PaymentTarget.HOTEL &&
+      createPaymentDto.bookingId
+    ) {
+      // Kiểm tra booking có tồn tại không
+      const booking = await this.bookingsService.findOne(
+        createPaymentDto.bookingId,
+      );
+      if (!booking) {
+        throw new NotFoundException(
+          `Không tìm thấy booking với ID ${createPaymentDto.bookingId}`,
+        );
+      }
+
+      // Nếu không có branchId nhưng booking có branch, lấy từ booking
+      if (!createPaymentDto.branchId && booking.branch?.id) {
+        createPaymentDto.branchId = booking.branch.id;
+      }
+    } else {
+      throw new BadRequestException(
+        `Phải cung cấp bookingId hoặc restaurantOrderId tương ứng với target`,
       );
     }
 
@@ -205,23 +240,9 @@ export class PaymentsService {
       );
     }
 
-    // Tạo payment mới
-    const payment = this.paymentRepository.create({
-      ...createPaymentDto,
-      status: paymentMethod.isOnline
-        ? PaymentStatus.PENDING
-        : PaymentStatus.CONFIRMED,
-    });
-
-    // Lưu payment
-    const savedPayment = await this.paymentRepository.save(payment);
-
-    // Nếu thanh toán đã được xác nhận, tự động cập nhật hóa đơn
-    if (savedPayment.status === PaymentStatus.CONFIRMED) {
-      await this.updateInvoiceAfterPayment(booking.id);
-    }
-
-    return savedPayment;
+    // Tạo bản ghi thanh toán mới
+    const payment = this.paymentRepository.create(createPaymentDto);
+    return this.paymentRepository.save(payment);
   }
 
   async createDeposit(bookingId: string, createDepositDto: CreateDepositDto) {
@@ -517,9 +538,18 @@ export class PaymentsService {
     endDate?: string;
     branchId?: string;
     searchText?: string;
+    target?: string;
   }) {
-    const { page, limit, status, startDate, endDate, branchId, searchText } =
-      options;
+    const {
+      page,
+      limit,
+      status,
+      startDate,
+      endDate,
+      branchId,
+      searchText,
+      target,
+    } = options;
 
     // Build the query
     const queryBuilder = this.invoiceRepository
@@ -527,7 +557,13 @@ export class PaymentsService {
       .leftJoinAndSelect('invoice.booking', 'booking')
       .leftJoinAndSelect('booking.customer', 'customer')
       .leftJoinAndSelect('booking.room', 'room')
-      .leftJoinAndSelect('booking.branch', 'branch');
+      .leftJoinAndSelect('booking.branch', 'branch')
+      .leftJoinAndSelect('invoice.branch', 'invoiceBranch');
+
+    // Lọc theo loại hóa đơn (khách sạn hoặc nhà hàng)
+    if (target) {
+      queryBuilder.andWhere('invoice.target = :target', { target });
+    }
 
     // Apply filters if provided
     if (status) {
@@ -548,7 +584,7 @@ export class PaymentsService {
 
     // Apply branch filter if provided
     if (branchId) {
-      queryBuilder.andWhere('branch.id = :branchId', { branchId });
+      queryBuilder.andWhere('invoice.branchId = :branchId', { branchId });
     }
 
     // Apply text search if provided
@@ -593,7 +629,15 @@ export class PaymentsService {
     const finalAmount = totalAmount - discountAmount;
 
     // Tạo mã hóa đơn
-    const invoiceNumber = `INV-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${booking.id.substring(0, 8)}`;
+    const invoiceNumber = `INV-${new Date().getFullYear()}${String(
+      new Date().getMonth() + 1,
+    ).padStart(2, '0')}${String(new Date().getDate()).padStart(
+      2,
+      '0',
+    )}-${booking.id.substring(0, 8)}`;
+
+    // Lấy branchId nếu có
+    const branchId = booking.branch?.id || undefined;
 
     // Tạo hóa đơn mới
     const invoice = this.invoiceRepository.create({
@@ -604,6 +648,8 @@ export class PaymentsService {
       finalAmount,
       issueDate: new Date(),
       dueDate: new Date(new Date().setDate(new Date().getDate() + 7)), // Hạn thanh toán 7 ngày
+      target: InvoiceTarget.HOTEL,
+      branchId,
     });
 
     return this.invoiceRepository.save(invoice);
@@ -615,6 +661,11 @@ export class PaymentsService {
     if (!invoice) {
       // Nếu chưa có hóa đơn, tạo mới
       const booking = await this.bookingsService.findOne(bookingId);
+      if (!booking) {
+        throw new NotFoundException(
+          `Không tìm thấy booking với ID ${bookingId}`,
+        );
+      }
       invoice = await this.createInvoice(booking as BookingData);
     }
 
@@ -654,6 +705,30 @@ export class PaymentsService {
     }
 
     return totalAmount;
+  }
+
+  // Tạo hóa đơn cho đơn hàng nhà hàng
+  private async createInvoiceForRestaurant(
+    restaurantOrderId: string,
+    branchId?: number,
+  ) {
+    // TODO: Hoàn thiện phương thức này khi có service để lấy thông tin đơn hàng nhà hàng
+    // Ví dụ mẫu:
+    const invoiceNumber = `INV-RES-${Date.now()}`;
+
+    const invoice = this.invoiceRepository.create({
+      invoiceNumber,
+      restaurantOrderId,
+      totalAmount: 0, // Cần tính toán dựa trên đơn hàng nhà hàng
+      discountAmount: 0,
+      finalAmount: 0,
+      issueDate: new Date(),
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 ngày sau
+      target: InvoiceTarget.RESTAURANT,
+      branchId: branchId || undefined,
+    });
+
+    return this.invoiceRepository.save(invoice);
   }
 
   /**

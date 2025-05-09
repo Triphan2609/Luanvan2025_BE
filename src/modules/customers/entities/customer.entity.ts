@@ -6,6 +6,8 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Unique,
+  Index,
 } from 'typeorm';
 import { IsEmail, IsOptional } from 'class-validator';
 import { Branch } from '../../branches/entities/branch.entity';
@@ -27,25 +29,32 @@ export enum Gender {
 }
 
 @Entity('customers')
+@Unique(['phone', 'branchId'])
+@Unique(['idNumber', 'branchId'])
+@Unique(['email', 'branchId'])
 export class Customer {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true, nullable: true })
+  @Column({ nullable: true })
+  @Index()
   customer_code: string;
 
   @Column()
   name: string;
 
-  @Column({ unique: true })
+  @Column()
+  @Index()
   phone: string;
 
   @Column({ nullable: true })
   @IsEmail()
   @IsOptional()
+  @Index()
   email: string;
 
-  @Column({ name: 'id_number', unique: true })
+  @Column({ name: 'id_number' })
+  @Index()
   idNumber: string;
 
   @Column({
@@ -93,11 +102,12 @@ export class Customer {
   @Column({ name: 'last_visit', nullable: true })
   lastVisit: Date;
 
-  @ManyToOne(() => Branch, { nullable: true })
+  @ManyToOne(() => Branch, { nullable: false })
   @JoinColumn({ name: 'branch_id' })
   branch: Branch;
 
-  @Column({ name: 'branch_id', nullable: true })
+  @Column({ name: 'branch_id' })
+  @Index()
   branchId: number;
 
   @CreateDateColumn({ name: 'created_at' })
