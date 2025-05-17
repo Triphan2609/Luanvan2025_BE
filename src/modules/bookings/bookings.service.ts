@@ -952,23 +952,23 @@ export class BookingsService {
   }
 
   // Send invoice by email
-  async sendInvoiceEmail(id: string, email: string) {
+  async sendInvoiceEmail(hotelInvoiceId: string, email: string) {
     try {
-      // First check if the booking exists
-      const booking = await this.findOne(id);
-
-      // Then delegate to payments service to send the invoice
+      // Gọi đúng hàm mới của paymentsService
       if (
         this.paymentsService &&
-        typeof this.paymentsService.sendInvoiceEmail === 'function'
+        typeof this.paymentsService.sendHotelInvoiceEmail === 'function'
       ) {
-        return this.paymentsService.sendInvoiceEmail(id, email);
+        return this.paymentsService.sendHotelInvoiceEmail(
+          hotelInvoiceId,
+          email,
+        );
       } else {
         throw new Error('Payment service not configured for email sending');
       }
     } catch (error) {
       throw new NotFoundException(
-        `Could not find booking with ID ${id} or email service is not configured`,
+        `Could not find hotel invoice with ID ${hotelInvoiceId} or email service is not configured`,
       );
     }
   }

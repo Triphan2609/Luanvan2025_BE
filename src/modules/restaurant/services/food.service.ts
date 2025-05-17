@@ -10,25 +10,29 @@ import { CreateFoodDto } from '../dto/create-food.dto';
 import { UpdateFoodDto } from '../dto/update-food.dto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { FoodIngredientService } from './food-ingredient.service';
 
 @Injectable()
 export class FoodService {
   constructor(
     @InjectRepository(Food)
     private readonly foodRepository: Repository<Food>,
+    private readonly foodIngredientService: FoodIngredientService,
   ) {}
 
   async create(createFoodDto: CreateFoodDto): Promise<Food> {
     try {
-      // Create a new food entity
+      const { ingredientsList, ...foodData } = createFoodDto;
       const food = new Food();
-
-      // Copy all properties directly - TypeORM will handle the conversions
-      Object.assign(food, createFoodDto);
-
-      // Save the entity
-      console.log('Creating food with data:', JSON.stringify(food));
-      return this.foodRepository.save(food);
+      Object.assign(food, foodData);
+      const savedFood = await this.foodRepository.save(food);
+      if (ingredientsList && Array.isArray(ingredientsList)) {
+        await this.foodIngredientService.setIngredientsForFood(
+          savedFood.id,
+          ingredientsList,
+        );
+      }
+      return savedFood;
     } catch (error: unknown) {
       console.error('Error creating food:', error);
       const errorMessage =
@@ -129,12 +133,17 @@ export class FoodService {
   }
 
   async update(id: string, updateFoodDto: UpdateFoodDto): Promise<Food> {
+    const { ingredientsList, ...foodData } = updateFoodDto;
     const food = await this.findOne(id);
-
-    // Update the food properties
-    Object.assign(food, updateFoodDto);
-
-    return this.foodRepository.save(food);
+    Object.assign(food, foodData);
+    const updatedFood = await this.foodRepository.save(food);
+    if (ingredientsList && Array.isArray(ingredientsList)) {
+      await this.foodIngredientService.setIngredientsForFood(
+        id,
+        ingredientsList,
+      );
+    }
+    return updatedFood;
   }
 
   async remove(id: string): Promise<void> {

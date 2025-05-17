@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { BranchType } from '../../branch-types/entities/branch-type.entity';
 import { Service } from '../../services/entities/service.entity';
-import { Area } from 'src/modules/areas/entities/area.entity';
+import { Menu } from '../../restaurant/menu/menu.entity';
 
 @Entity('branches')
 export class Branch {
@@ -76,6 +76,6 @@ export class Branch {
   @OneToMany(() => Service, (service) => service.branch)
   services: Service[];
 
-  @OneToMany(() => Area, (area) => area.branch)
-  areas: Area[]; // Mối quan hệ ngược với Area
+  @OneToMany(() => Menu, (menu) => menu.branch)
+  menus: Menu[];
 }

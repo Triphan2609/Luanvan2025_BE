@@ -10,7 +10,6 @@ import { RolesModule } from './modules/roles/roles.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { BranchTypesModule } from './modules/branch-types/branch-types.module';
 import { ServicesModule } from './modules/services/services.module';
-import { AreasModule } from './modules/areas/areas.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { RolesEmployeeModule } from './modules/roles_employee/roles-employee.module';
@@ -27,6 +26,7 @@ import { BookingsModule } from './modules/bookings/bookings.module';
 import { EmailModule } from './modules/email/email.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { RestaurantModule } from './modules/restaurant/restaurant.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
 
 @Module({
   imports: [
@@ -64,7 +64,6 @@ import { RestaurantModule } from './modules/restaurant/restaurant.module';
     BranchesModule,
     BranchTypesModule,
     ServicesModule,
-    AreasModule,
     EmployeesModule,
     DepartmentsModule,
     RolesEmployeeModule,
@@ -80,6 +79,7 @@ import { RestaurantModule } from './modules/restaurant/restaurant.module';
     EmailModule,
     PaymentsModule,
     RestaurantModule,
+    PromotionsModule,
   ],
   providers: [
     {

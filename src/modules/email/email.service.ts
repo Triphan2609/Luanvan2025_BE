@@ -178,4 +178,39 @@ export class EmailService {
       throw error;
     }
   }
+
+  async sendRestaurantInvoiceEmail(
+    to: string,
+    subject: string,
+    invoiceData: any,
+  ): Promise<any> {
+    try {
+      this.logger.log(`Sending restaurant invoice email to ${to}`);
+      return this.mailerService.sendMail({
+        to,
+        subject: subject || 'Hóa đơn thanh toán nhà hàng',
+        template: 'restaurant-invoice',
+        context: {
+          branchName: invoiceData.branch?.name || 'Nhà hàng',
+          branchAddress: invoiceData.branch?.address || '',
+          branchPhone: invoiceData.branch?.phone || '',
+          invoiceNumber: invoiceData.invoiceNumber,
+          paymentDate: invoiceData.paymentDate,
+          tableNumber: invoiceData.tableNumber,
+          areaName: invoiceData.areaName,
+          staffName: invoiceData.staffName,
+          items: invoiceData.items || [],
+          totalAmount: invoiceData.totalAmount?.toLocaleString('vi-VN') || '0',
+          notes: invoiceData.notes || '',
+          currentYear: new Date().getFullYear(),
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Error sending restaurant invoice email: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : '',
+      );
+      throw error;
+    }
+  }
 }

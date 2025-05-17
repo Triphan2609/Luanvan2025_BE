@@ -7,9 +7,10 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { Booking } from '../../bookings/entities/booking.entity';
 import { PaymentMethod } from './payment-method.entity';
 import { Branch } from '../../branches/entities/branch.entity';
+import { HotelInvoice } from './hotel-invoice.entity';
+import { RestaurantInvoice } from './restaurant-invoice.entity';
 
 export enum PaymentStatus {
   PENDING = 'pending',
@@ -24,11 +25,6 @@ export enum PaymentType {
   FULL = 'full',
   EXTRA = 'extra',
   REFUND = 'refund',
-}
-
-export enum PaymentTarget {
-  HOTEL = 'hotel',
-  RESTAURANT = 'restaurant',
 }
 
 @Entity('payments')
@@ -53,28 +49,25 @@ export class Payment {
   })
   type: PaymentType;
 
-  @Column({
-    type: 'enum',
-    enum: PaymentTarget,
-    default: PaymentTarget.HOTEL,
-  })
-  target: PaymentTarget;
-
   @Column({ nullable: true })
   transactionId: string;
 
   @Column({ nullable: true })
   notes: string;
 
-  @ManyToOne(() => Booking, { nullable: true })
-  @JoinColumn({ name: 'bookingId' })
-  booking: Booking;
+  @ManyToOne(() => HotelInvoice, { nullable: true })
+  @JoinColumn({ name: 'hotelInvoiceId' })
+  hotelInvoice: HotelInvoice;
 
   @Column({ nullable: true })
-  bookingId: string;
+  hotelInvoiceId: string;
+
+  @ManyToOne(() => RestaurantInvoice, { nullable: true })
+  @JoinColumn({ name: 'restaurantInvoiceId' })
+  restaurantInvoice: RestaurantInvoice;
 
   @Column({ nullable: true })
-  restaurantOrderId: string;
+  restaurantInvoiceId: string;
 
   @ManyToOne(() => PaymentMethod)
   @JoinColumn({ name: 'methodId' })

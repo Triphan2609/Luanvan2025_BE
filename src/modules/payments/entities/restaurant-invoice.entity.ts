@@ -8,25 +8,19 @@ import {
   JoinColumn,
   OneToMany,
 } from 'typeorm';
-import { Booking } from '../../bookings/entities/booking.entity';
 import { Payment } from './payment.entity';
 import { Branch } from '../../branches/entities/branch.entity';
 
-// Define the InvoiceStatus enum
-export enum InvoiceStatus {
+export enum RestaurantInvoiceStatus {
   PENDING = 'pending',
   PAID = 'paid',
+  REFUNDED = 'refunded',
+  CANCELED = 'canceled',
   OVERDUE = 'overdue',
-  CANCELLED = 'cancelled',
 }
 
-export enum InvoiceTarget {
-  HOTEL = 'hotel',
-  RESTAURANT = 'restaurant',
-}
-
-@Entity('invoices')
-export class Invoice {
+@Entity('restaurant_invoices')
+export class RestaurantInvoice {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -42,6 +36,13 @@ export class Invoice {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   finalAmount: number;
 
+  @Column({
+    type: 'enum',
+    enum: RestaurantInvoiceStatus,
+    default: RestaurantInvoiceStatus.PENDING,
+  })
+  status: RestaurantInvoiceStatus;
+
   @Column({ nullable: true })
   notes: string;
 
@@ -51,24 +52,10 @@ export class Invoice {
   @Column({ type: 'date', nullable: true })
   dueDate: Date;
 
-  @ManyToOne(() => Booking, { nullable: true })
-  @JoinColumn({ name: 'bookingId' })
-  booking: Booking;
-
-  @Column({ nullable: true })
-  bookingId: string;
-
   @Column({ nullable: true })
   restaurantOrderId: string;
 
-  @Column({
-    type: 'enum',
-    enum: InvoiceTarget,
-    default: InvoiceTarget.HOTEL,
-  })
-  target: InvoiceTarget;
-
-  @OneToMany(() => Payment, (payment) => payment.booking)
+  @OneToMany(() => Payment, (payment) => payment.restaurantInvoice)
   payments: Payment[];
 
   @Column({ default: false })

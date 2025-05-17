@@ -2,11 +2,15 @@ import {
   IsString,
   IsNotEmpty,
   IsNumber,
-  IsEnum,
   IsOptional,
+  Min,
 } from 'class-validator';
 
 export class CreateServiceDto {
+  @IsString()
+  @IsOptional()
+  id?: string;
+
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -17,13 +21,14 @@ export class CreateServiceDto {
 
   @IsNumber()
   @IsNotEmpty()
+  @Min(0)
   price: number;
 
-  @IsEnum(['active', 'inactive'])
-  @IsOptional()
-  status?: 'active' | 'inactive';
-
-  @IsNumber()
+  @IsString()
   @IsNotEmpty()
-  branch_id: number;
+  serviceTypeId: string;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

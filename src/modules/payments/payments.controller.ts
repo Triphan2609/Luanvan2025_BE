@@ -6,25 +6,158 @@ import {
   Delete,
   Body,
   Param,
-  Query,
   Res,
   BadRequestException,
+  Put,
+  Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { CreateDepositDto } from './dto/create-deposit.dto';
-import { ProcessRefundDto } from './dto/process-refund.dto';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 import { UpdateBankAccountDto } from './dto/update-bank-account.dto';
 import { Response } from 'express';
+import { CreateHotelInvoiceDto } from './dto/create-hotel-invoice.dto';
+import { CreateRestaurantInvoiceDto } from './dto/create-restaurant-invoice.dto';
+import { PaymentStatus } from './entities/payment.entity';
+import { HotelInvoiceStatus } from './entities/hotel-invoice.entity';
+import { RestaurantInvoiceStatus } from './entities/restaurant-invoice.entity';
 
 @ApiTags('payments')
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  // Bank Account endpoints
+  // Payment endpoints
+  @Post()
+  @ApiOperation({ summary: 'Create a new payment' })
+  @ApiResponse({ status: 201, description: 'Payment created successfully' })
+  createPayment(@Body() createPaymentDto: CreatePaymentDto) {
+    return this.paymentsService.createPayment(createPaymentDto);
+  }
+
+  @Get('methods')
+  @ApiOperation({ summary: 'Get all payment methods' })
+  @ApiResponse({ status: 200, description: 'Return all payment methods' })
+  async findAllMethods() {
+    console.log('---[LOG] GET /payments/methods called ---');
+    const result = await this.paymentsService.findAllMethods();
+    console.log('Kết quả trả về methods:', result);
+    return result;
+  }
+
+  @Get('hotel-invoices')
+  @ApiOperation({ summary: 'Get all hotel invoices' })
+  @ApiResponse({ status: 200, description: 'Return all hotel invoices' })
+  async findHotelInvoices(@Query('bookingId') bookingId?: string) {
+    console.log('---[LOG] GET /payments/hotel-invoices called ---');
+    console.log('BookingId nhận được:', bookingId);
+    if (bookingId) {
+      const result =
+        await this.paymentsService.findHotelInvoiceByBookingId(bookingId);
+      console.log('Kết quả trả về hotel-invoices:', result);
+      return result;
+    }
+    const all = await this.paymentsService.findAllHotelInvoices();
+    console.log('Kết quả trả về tất cả hotel-invoices:', all);
+    return all;
+  }
+
+  @Post('hotel-invoices')
+  @ApiOperation({ summary: 'Create a new hotel invoice' })
+  @ApiResponse({
+    status: 201,
+    description: 'Hotel invoice created successfully',
+  })
+  createHotelInvoice(@Body() createHotelInvoiceDto: CreateHotelInvoiceDto) {
+    return this.paymentsService.createHotelInvoice(createHotelInvoiceDto);
+  }
+
+  @Get('hotel-invoices/:id')
+  @ApiOperation({ summary: 'Get hotel invoice by ID' })
+  @ApiResponse({ status: 200, description: 'Return hotel invoice details' })
+  findHotelInvoiceById(@Param('id') id: string) {
+    return this.paymentsService.findHotelInvoiceById(id);
+  }
+
+  @Patch('hotel-invoices/:id/status')
+  @ApiOperation({ summary: 'Update hotel invoice status' })
+  @ApiResponse({
+    status: 200,
+    description: 'Hotel invoice status updated successfully',
+  })
+  updateHotelInvoiceStatus(
+    @Param('id') id: string,
+    @Body('status') status: HotelInvoiceStatus,
+  ) {
+    return this.paymentsService.updateHotelInvoiceStatus(id, status);
+  }
+
+  @Post('hotel-invoices/:id/send-email')
+  @ApiOperation({ summary: 'Send hotel invoice to customer email' })
+  @ApiResponse({
+    status: 200,
+    description: 'Hotel invoice sent to email successfully',
+  })
+  async sendHotelInvoiceEmail(
+    @Param('id') hotelInvoiceId: string,
+    @Body('email') email: string,
+  ) {
+    await this.paymentsService.sendHotelInvoiceEmail(hotelInvoiceId, email);
+    return { message: 'Email sent successfully' };
+  }
+
+  @Patch('hotel-invoices/:id/confirm')
+  @ApiOperation({ summary: 'Confirm hotel invoice payment' })
+  @ApiResponse({ status: 200, description: 'Hotel invoice payment confirmed' })
+  confirmHotelInvoicePayment(@Param('id') hotelInvoiceId: string) {
+    return this.paymentsService.confirmHotelInvoicePayment(hotelInvoiceId);
+  }
+
+  @Get('restaurant-invoices')
+  @ApiOperation({ summary: 'Get all restaurant invoices' })
+  @ApiResponse({ status: 200, description: 'Return all restaurant invoices' })
+  findAllRestaurantInvoices() {
+    return this.paymentsService.findAllRestaurantInvoices();
+  }
+
+  @Post('restaurant-invoices')
+  @ApiOperation({ summary: 'Create a new restaurant invoice' })
+  @ApiResponse({
+    status: 201,
+    description: 'Restaurant invoice created successfully',
+  })
+  createRestaurantInvoice(
+    @Body() createRestaurantInvoiceDto: CreateRestaurantInvoiceDto,
+  ) {
+    return this.paymentsService.createRestaurantInvoice(
+      createRestaurantInvoiceDto,
+    );
+  }
+
+  @Get('restaurant-invoices/:id')
+  @ApiOperation({ summary: 'Get restaurant invoice by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return restaurant invoice details',
+  })
+  findRestaurantInvoiceById(@Param('id') id: string) {
+    return this.paymentsService.findRestaurantInvoiceById(id);
+  }
+
+  @Patch('restaurant-invoices/:id/status')
+  @ApiOperation({ summary: 'Update restaurant invoice status' })
+  @ApiResponse({
+    status: 200,
+    description: 'Restaurant invoice status updated successfully',
+  })
+  updateRestaurantInvoiceStatus(
+    @Param('id') id: string,
+    @Body('status') status: RestaurantInvoiceStatus,
+  ) {
+    return this.paymentsService.updateRestaurantInvoiceStatus(id, status);
+  }
+
   @Get('bank-accounts')
   @ApiOperation({ summary: 'Get all bank accounts' })
   @ApiResponse({ status: 200, description: 'Return all bank accounts' })
@@ -56,7 +189,7 @@ export class PaymentsController {
     return this.paymentsService.createBankAccount(createBankAccountDto);
   }
 
-  @Patch('bank-accounts/:id')
+  @Put('bank-accounts/:id')
   @ApiOperation({ summary: 'Update a bank account' })
   @ApiResponse({
     status: 200,
@@ -79,92 +212,31 @@ export class PaymentsController {
     return this.paymentsService.removeBankAccount(id);
   }
 
-  @Get('methods')
-  @ApiOperation({ summary: 'Get all payment methods' })
-  @ApiResponse({ status: 200, description: 'Return all payment methods' })
-  findAllMethods() {
-    return this.paymentsService.findAllMethods();
-  }
-
   @Get()
   @ApiOperation({ summary: 'Get all payments' })
   @ApiResponse({ status: 200, description: 'Return all payments' })
-  findAll() {
-    return this.paymentsService.findAll();
+  findAllPayments() {
+    return this.paymentsService.findAllPayments();
   }
 
-  @Get('booking/:bookingId')
-  @ApiOperation({ summary: 'Get payments by booking ID' })
-  @ApiResponse({ status: 200, description: 'Return payments for a booking' })
-  findByBookingId(@Param('bookingId') bookingId: string) {
-    return this.paymentsService.findByBookingId(bookingId);
+  @Get(':id')
+  @ApiOperation({ summary: 'Get payment by ID' })
+  @ApiResponse({ status: 200, description: 'Return payment details' })
+  findPaymentById(@Param('id') id: string) {
+    return this.paymentsService.findPaymentById(id);
   }
 
-  @Post()
-  @ApiOperation({ summary: 'Create a new payment' })
-  @ApiResponse({ status: 201, description: 'Payment created successfully' })
-  create(@Body() createPaymentDto: CreatePaymentDto) {
-    return this.paymentsService.create(createPaymentDto);
-  }
-
-  @Post('deposit/:bookingId')
-  @ApiOperation({ summary: 'Create a deposit payment' })
-  @ApiResponse({
-    status: 201,
-    description: 'Deposit payment created successfully',
-  })
-  createDeposit(
-    @Param('bookingId') bookingId: string,
-    @Body() createDepositDto: CreateDepositDto,
-  ) {
-    return this.paymentsService.createDeposit(bookingId, createDepositDto);
-  }
-
-  @Post(':paymentId/refund')
-  @ApiOperation({ summary: 'Process a refund' })
-  @ApiResponse({ status: 200, description: 'Refund processed successfully' })
-  processRefund(
-    @Param('paymentId') paymentId: string,
-    @Body() processRefundDto: ProcessRefundDto,
-  ) {
-    return this.paymentsService.processRefund(paymentId, processRefundDto);
-  }
-
-  @Patch(':paymentId/confirm')
-  @ApiOperation({ summary: 'Confirm a payment' })
-  @ApiResponse({ status: 200, description: 'Payment confirmed successfully' })
-  confirmPayment(@Param('paymentId') paymentId: string) {
-    return this.paymentsService.confirmPayment(paymentId);
-  }
-
-  @Post('invoice/:bookingId')
-  @ApiOperation({ summary: 'Generate and send invoice' })
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update payment status' })
   @ApiResponse({
     status: 200,
-    description: 'Invoice generated and sent successfully',
+    description: 'Payment status updated successfully',
   })
-  generateAndSendInvoice(@Param('bookingId') bookingId: string) {
-    return this.paymentsService.generateAndSendInvoice(bookingId);
-  }
-
-  @Post('invoice/:bookingId/send-email')
-  @ApiOperation({ summary: 'Send invoice to customer email' })
-  @ApiResponse({
-    status: 200,
-    description: 'Invoice sent to email successfully',
-  })
-  sendInvoiceEmail(
-    @Param('bookingId') bookingId: string,
-    @Body() body: { email: string },
+  updatePaymentStatus(
+    @Param('id') id: string,
+    @Body('status') status: PaymentStatus,
   ) {
-    return this.paymentsService.sendInvoiceEmail(bookingId, body.email);
-  }
-
-  @Get('invoice/:bookingId')
-  @ApiOperation({ summary: 'Get invoice for a booking' })
-  @ApiResponse({ status: 200, description: 'Return invoice for booking' })
-  getInvoice(@Param('bookingId') bookingId: string) {
-    return this.paymentsService.getInvoice(bookingId);
+    return this.paymentsService.updatePaymentStatus(id, status);
   }
 
   @Get('invoice/:bookingId/download')
@@ -199,31 +271,5 @@ export class PaymentsController {
       console.error('Error downloading invoice:', error);
       throw error;
     }
-  }
-
-  @Get('invoices')
-  @ApiOperation({ summary: 'Get all invoices with optional filters' })
-  @ApiResponse({
-    status: 200,
-    description: 'Return all invoices with pagination',
-  })
-  getAllInvoices(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
-    @Query('status') status?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('branchId') branchId?: string,
-    @Query('searchText') searchText?: string,
-  ) {
-    return this.paymentsService.getAllInvoices({
-      page,
-      limit,
-      status,
-      startDate,
-      endDate,
-      branchId,
-      searchText,
-    });
   }
 }

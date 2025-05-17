@@ -7,7 +7,7 @@ import {
   IsArray,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { MenuType, MenuStatus } from '../entities/menu.entity';
+import { MenuType, MenuStatus } from '../menu/menu.entity';
 import { Type } from 'class-transformer';
 
 export class CreateMenuDto {

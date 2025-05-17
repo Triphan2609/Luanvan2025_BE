@@ -106,4 +106,18 @@ export class CreateFoodDto {
   @IsUUID(undefined, { each: true })
   @IsOptional()
   menuIds?: string[];
+
+  @ApiProperty({
+    description:
+      'Danh sách nguyên liệu cho món ăn (mỗi phần tử gồm ingredientId và amount)',
+    required: false,
+    type: [Object],
+    example: [
+      { ingredientId: 'uuid-nguyen-lieu-1', amount: 2 },
+      { ingredientId: 'uuid-nguyen-lieu-2', amount: 1 },
+    ],
+  })
+  @IsArray()
+  @IsOptional()
+  ingredientsList?: { ingredientId: string; amount: number }[];
 }

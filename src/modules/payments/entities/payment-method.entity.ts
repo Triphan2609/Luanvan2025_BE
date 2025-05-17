@@ -9,7 +9,7 @@ import {
 export enum PaymentMethodType {
   CASH = 'cash',
   BANK_TRANSFER = 'bank_transfer',
-  VNPAY = 'vnpay',
+  ZALO_PAY = 'zalo_pay',
 }
 
 @Entity('payment_methods')

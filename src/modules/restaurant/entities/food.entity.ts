@@ -12,7 +12,7 @@ import {
 } from 'typeorm';
 import { Branch } from '../../branches/entities/branch.entity';
 import { FoodCategory } from './food-category.entity';
-import { Menu } from './menu.entity';
+import { Menu } from '../menu/menu.entity';
 
 export enum FoodStatus {
   AVAILABLE = 'available',
